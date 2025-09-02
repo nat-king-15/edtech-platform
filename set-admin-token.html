@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Set Admin Token</title>
+</head>
+<body>
+    <h1>Setting Admin Token...</h1>
+    <script>
+        // Admin token for user MpWuryzrCuRDRvLLi8rY8FSVYW32
+        const adminToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOiJNcFd1cnl6ckN1UkRSdkxMaThyWThGU1ZZVzMyIiwiZW1haWwiOiJuYXRyYWpsaWxoYXJlYWNjMTUxQGdtYWlsLmNvbSIsInJvbGUiOiJhZG1pbiIsImRpc3BsYXlOYW1lIjoiTkFUUkFKIExJTEhBUkUiLCJpYXQiOjE3NTY2Mzg1MDQsImV4cCI6MTc1NzI0MzMwNH0.lZQSmRl-fdTtDERsbIjumbOsTbr79D84vBx6rnZ-_Ok';
+        
+        const adminUser = {
+            uid: 'MpWuryzrCuRDRvLLi8rY8FSVYW32',
+            email: 'natrajlilhareacc151@gmail.com',
+            displayName: 'NATRAJ LILHARE',
+            role: 'admin'
+        };
+        
+        // Set token and user in localStorage
+        localStorage.setItem('authToken', adminToken);
+        localStorage.setItem('user', JSON.stringify(adminUser));
+        
+        console.log('Admin token set successfully!');
+        console.log('Token:', adminToken);
+        console.log('User:', adminUser);
+        
+        document.body.innerHTML += '<p>Admin token has been set in localStorage!</p>';
+        document.body.innerHTML += '<p>You can now close this tab and refresh your admin page.</p>';
+        document.body.innerHTML += '<p><a href="http://localhost:3000/admin/users" target="_blank">Go to Admin Users Page</a></p>';
+    </script>
+</body>
+</html>
