@@ -405,9 +405,9 @@ class AnalyticsService {
       const newUsersSnapshot = await newUsersRef.get();
       const newUsers = newUsersSnapshot.size;
       
-      // Active users (with recent activity)
-      const activeUsersRef = db.collection('userSessions')
-        .where('lastActive', '>=', startDate);
+      // Active users (with recent activity) - using users collection with lastLoginAt
+      const activeUsersRef = db.collection('users')
+        .where('lastLoginAt', '>=', startDate);
       const activeUsersSnapshot = await activeUsersRef.get();
       const activeUsers = activeUsersSnapshot.size;
       
@@ -465,6 +465,133 @@ class AnalyticsService {
     } catch (error) {
       console.error('Error getting analytics cache:', error);
       return null;
+    }
+  }
+
+  async getUserMetrics(startDate, userType = null) {
+    try {
+      let usersRef = db.collection('users');
+      
+      if (userType) {
+        usersRef = usersRef.where('role', '==', userType);
+      }
+      
+      const usersSnapshot = await usersRef.get();
+      const users = [];
+      
+      usersSnapshot.forEach(doc => {
+        users.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const totalUsers = users.length;
+      const newUsers = users.filter(user => 
+        user.createdAt && user.createdAt.toDate() >= startDate
+      ).length;
+      
+      const activeUsers = users.filter(user => 
+        user.lastLoginAt && user.lastLoginAt.toDate() >= startDate
+      ).length;
+      
+      return {
+        totalUsers,
+        newUsers,
+        activeUsers,
+        usersByRole: {
+          student: users.filter(u => u.role === 'student').length,
+          teacher: users.filter(u => u.role === 'teacher').length,
+          admin: users.filter(u => u.role === 'admin').length
+        }
+      };
+    } catch (error) {
+      console.error('Error getting user metrics:', error);
+      return {
+        totalUsers: 0,
+        newUsers: 0,
+        activeUsers: 0,
+        usersByRole: { student: 0, teacher: 0, admin: 0 }
+      };
+    }
+  }
+
+  async getCourseMetrics(startDate) {
+    try {
+      const coursesSnapshot = await db.collection('courses').get();
+      const courses = [];
+      
+      coursesSnapshot.forEach(doc => {
+        courses.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const totalCourses = courses.length;
+      const newCourses = courses.filter(course => 
+        course.createdAt && course.createdAt.toDate() >= startDate
+      ).length;
+      
+      return {
+        totalCourses,
+        newCourses,
+        publishedCourses: courses.filter(c => c.status === 'published').length,
+        draftCourses: courses.filter(c => c.status === 'draft').length
+      };
+    } catch (error) {
+      console.error('Error getting course metrics:', error);
+      return {
+        totalCourses: 0,
+        newCourses: 0,
+        publishedCourses: 0,
+        draftCourses: 0
+      };
+    }
+  }
+
+  async getRevenueMetrics(startDate) {
+    try {
+      const paymentsRef = db.collection('payments')
+        .where('status', '==', 'completed')
+        .where('createdAt', '>=', startDate);
+      
+      const paymentsSnapshot = await paymentsRef.get();
+      const payments = [];
+      
+      paymentsSnapshot.forEach(doc => {
+        payments.push({ id: doc.id, ...doc.data() });
+      });
+      
+      const totalRevenue = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+      const totalTransactions = payments.length;
+      
+      return {
+        totalRevenue,
+        totalTransactions,
+        averageTransactionValue: totalTransactions > 0 ? totalRevenue / totalTransactions : 0
+      };
+    } catch (error) {
+      console.error('Error getting revenue metrics:', error);
+      return {
+        totalRevenue: 0,
+        totalTransactions: 0,
+        averageTransactionValue: 0
+      };
+    }
+  }
+
+  async getSystemMetrics(startDate) {
+    try {
+      // Basic system metrics - can be expanded based on monitoring needs
+      return {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        nodeVersion: process.version,
+        platform: process.platform
+      };
+    } catch (error) {
+      console.error('Error getting system metrics:', error);
+      return {
+        uptime: 0,
+        memoryUsage: {},
+        nodeVersion: 'unknown',
+        platform: 'unknown'
+      };
     }
   }
 }

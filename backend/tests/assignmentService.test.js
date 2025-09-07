@@ -1,10 +1,10 @@
 const assignmentService = require('../src/services/assignmentService');
-const { db, storage } = require('../config/firebase');
+const { firestore, storage } = require('../config/firebase');
 const { v4: uuidv4 } = require('uuid');
 
 // Mock Firebase
 jest.mock('../config/firebase', () => ({
-  db: {
+  firestore: {
     collection: jest.fn(() => ({
       doc: jest.fn(() => ({
         get: jest.fn(),
@@ -110,7 +110,7 @@ describe('AssignmentService', () => {
       get: jest.fn().mockResolvedValue(mockSnapshot)
     };
 
-    db.collection.mockReturnValue(mockCollection);
+    firestore.collection.mockReturnValue(mockCollection);
   });
 
   describe('createAssignment', () => {
@@ -120,7 +120,7 @@ describe('AssignmentService', () => {
       instructions: 'Test Instructions',
       batchId: 'batch1',
       subjectId: 'subject1',
-      dueDate: '2024-12-31T23:59:59.000Z',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
       maxPoints: 100,
       allowLateSubmission: true,
       lateSubmissionPenalty: 10,
@@ -167,11 +167,11 @@ describe('AssignmentService', () => {
     it('should throw error for past due date', async () => {
       const pastData = {
         ...validAssignmentData,
-        dueDate: '2020-01-01T00:00:00.000Z'
+        dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 1 day ago
       };
 
       await expect(assignmentService.createAssignment(pastData, 'teacher1'))
-        .rejects.toThrow('Due date must be in the future');
+        .rejects.toThrow('Due date must be at least 1 minute in the future');
     });
   });
 
@@ -293,7 +293,7 @@ describe('AssignmentService', () => {
         maxFiles: 5,
         allowedFileTypes: ['pdf', 'doc'],
         maxFileSize: 5242880,
-        dueDate: '2024-12-31T23:59:59.000Z'
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
       });
 
       // Mock storage operations

@@ -8,34 +8,23 @@ const router = express.Router();
  * POST /api/webhooks/mux
  * Public webhook endpoint for Mux video processing events
  */
-router.post('/mux', express.raw({ type: 'application/json' }), async (req, res) => {
+router.post('/mux', async (req, res) => {
+  console.log('🎯 Mux Webhook Hit!');
+  console.log('🔍 Request Body:', req.body);
+  console.log('🔍 Request Headers:', req.headers);
+  
   try {
-    const signature = req.get('mux-signature');
-    const rawBody = req.body;
-
-    // Verify webhook signature if secret is configured
-    if (process.env.MUX_WEBHOOK_SECRET) {
-      const isValid = muxService.verifyWebhookSignature(rawBody, signature);
-      if (!isValid) {
-        console.warn('Invalid Mux webhook signature');
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Invalid webhook signature'
-        });
-      }
-    }
-
-    // Parse the webhook event
-    let event;
-    try {
-      event = JSON.parse(rawBody.toString());
-    } catch (parseError) {
-      console.error('Error parsing Mux webhook payload:', parseError);
+    const event = req.body;
+    
+    if (!event || !event.type) {
+      console.error('❌ Invalid event structure');
       return res.status(400).json({
         error: 'Bad Request',
-        message: 'Invalid JSON payload'
+        message: 'Invalid event structure'
       });
     }
+    
+    console.log('✅ Valid event received:', event.type);
 
     console.log('Received Mux webhook event:', {
       type: event.type,

@@ -1,14 +1,21 @@
 const express = require('express');
 const { firestore } = require('../config/firebase');
 const { authMiddleware } = require('../middleware/authMiddleware');
+const { validateRequest } = require('../middleware/validation');
+const { body, param, query } = require('express-validator');
 const admin = require('firebase-admin');
 const razorpay = require('../config/razorpay');
 const crypto = require('crypto');
 const notificationService = require('../services/notificationService');
 const videoProgressService = require('../services/videoProgressService');
 const quizService = require('../services/quizService');
+const validator = require('validator');
+const studentBatchRoutes = require('../src/routes/student/batches');
 
 const router = express.Router();
+
+// Mount batch routes
+router.use('/batches', studentBatchRoutes);
 
 /**
  * Middleware to ensure user has student role
@@ -625,11 +632,21 @@ router.put('/notifications/mark-all-read', authMiddleware, requireStudent, async
 });
 
 /**
- * Update video progress
+ * Update video progress endpoint
  * POST /api/student/video-progress
  * Student-only endpoint to update video watching progress
  */
-router.post('/video-progress', authMiddleware, requireStudent, async (req, res) => {
+router.post('/video-progress', 
+  [
+    body('videoId').isAlphanumeric().withMessage('Invalid video ID format'),
+    body('batchId').isAlphanumeric().withMessage('Invalid batch ID format'),
+    body('subjectId').isAlphanumeric().withMessage('Invalid subject ID format'),
+    body('currentTime').isNumeric().withMessage('Current time must be a number'),
+    body('duration').isNumeric().withMessage('Duration must be a number'),
+    body('completed').optional().isBoolean().withMessage('Completed must be a boolean'),
+    validateRequest
+  ],
+  authMiddleware, requireStudent, async (req, res) => {
   try {
     const { videoId, batchId, subjectId, currentTime, duration, completed } = req.body;
     
@@ -910,7 +927,14 @@ router.get('/quizzes/:quizId', authMiddleware, requireStudent, async (req, res) 
  * POST /api/student/quizzes/:quizId/submit
  * Body: { answers: Array, timeSpent: Number }
  */
-router.post('/quizzes/:quizId/submit', authMiddleware, requireStudent, async (req, res) => {
+router.post('/quizzes/:quizId/submit', 
+  [
+    param('quizId').isAlphanumeric().withMessage('Invalid quiz ID format'),
+    body('answers').isArray().withMessage('Answers must be an array'),
+    body('timeSpent').isNumeric().withMessage('Time spent must be a number'),
+    validateRequest
+  ],
+  authMiddleware, requireStudent, async (req, res) => {
   try {
     const { quizId } = req.params;
     const { answers, timeSpent } = req.body;
@@ -964,5 +988,92 @@ router.get('/quizzes/:quizId/results', authMiddleware, requireStudent, async (re
     });
   }
 });
+
+
+
+/**
+ * @swagger
+ * /api/student/notifications/{notificationId}/read:
+ *   post:
+ *     summary: Mark notification as read
+ *     tags: [Student]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Notification not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/notifications/:notificationId/read', 
+  authMiddleware, 
+  requireStudent,
+  [
+    param('notificationId').isString().notEmpty().withMessage('Notification ID is required')
+  ],
+  validateRequest,
+  async (req, res) => {
+    try {
+      const { notificationId } = req.params;
+      const studentId = req.user.uid;
+
+      // Check if notification exists and belongs to student
+      const notificationDoc = await firestore.collection('notifications').doc(notificationId).get();
+      
+      if (!notificationDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Notification not found'
+          }
+        });
+      }
+
+      const notificationData = notificationDoc.data();
+      if (notificationData.userId !== studentId) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'ACCESS_DENIED',
+            message: 'Access denied to this notification'
+          }
+        });
+      }
+
+      // Mark as read
+      await firestore.collection('notifications').doc(notificationId).update({
+        read: true,
+        readAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({
+        success: true,
+        message: 'Notification marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Failed to mark notification as read',
+          details: error.message
+        }
+      });
+    }
+  }
+);
 
 module.exports = router;

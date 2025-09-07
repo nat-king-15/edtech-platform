@@ -15,7 +15,11 @@ class NotificationService {
       CONTENT_SCHEDULED: 'content_scheduled',
       BATCH_PUBLISHED: 'batch_published',
       ASSIGNMENT_DUE: 'assignment_due',
-      WELCOME: 'welcome'
+      WELCOME: 'welcome',
+      LIVE_STREAM_STARTED: 'live_stream_started',
+      LIVE_STREAM_ENDED: 'live_stream_ended',
+      LIVE_STREAM_REMINDER: 'live_stream_reminder',
+      RECORDING_AVAILABLE: 'recording_available'
     };
 
     this.templates = {
@@ -397,6 +401,189 @@ class NotificationService {
    * Delete old notifications (cleanup)
    * @param {number} daysOld - Delete notifications older than this many days
    */
+  /**
+   * Send live stream started notification to students
+   * @param {string} batchId - Batch ID
+   * @param {Object} streamData - Live stream data
+   */
+  async notifyLiveStreamStarted(batchId, streamData) {
+    try {
+      console.log(`Notifying students for batch ${batchId} about live stream: ${streamData.title}`);
+      
+      // Get all students enrolled in the batch
+      const enrollmentsSnapshot = await firestore
+        .collection('enrollments')
+        .where('batchId', '==', batchId)
+        .where('status', '==', 'active')
+        .get();
+
+      const studentIds = enrollmentsSnapshot.docs.map(doc => doc.data().studentId);
+      
+      if (studentIds.length === 0) {
+        console.log('No active students found for batch:', batchId);
+        return;
+      }
+
+      // Send notifications to all students
+      const notificationPromises = studentIds.map(studentId => 
+        this.sendNotification({
+          userId: studentId,
+          type: this.notificationTypes.LIVE_STREAM_STARTED,
+          title: 'Live Class Started!',
+          message: `${streamData.title} is now live. Join now!`,
+          data: {
+            scheduleId: streamData.scheduleId,
+            liveStreamId: streamData.liveStreamId,
+            playbackIds: streamData.livePlaybackIds
+          },
+          priority: 'high'
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      console.log(`Successfully notified ${studentIds.length} students about live stream start`);
+    } catch (error) {
+      console.error('Error notifying students about live stream start:', error);
+    }
+  }
+
+  /**
+   * Send live stream ended notification to students
+   * @param {string} batchId - Batch ID
+   * @param {Object} streamData - Live stream data
+   */
+  async notifyLiveStreamEnded(batchId, streamData) {
+    try {
+      console.log(`Notifying students for batch ${batchId} about live stream end: ${streamData.title}`);
+      
+      // Get all students enrolled in the batch
+      const enrollmentsSnapshot = await firestore
+        .collection('enrollments')
+        .where('batchId', '==', batchId)
+        .where('status', '==', 'active')
+        .get();
+
+      const studentIds = enrollmentsSnapshot.docs.map(doc => doc.data().studentId);
+      
+      if (studentIds.length === 0) {
+        console.log('No active students found for batch:', batchId);
+        return;
+      }
+
+      // Send notifications to all students
+      const notificationPromises = studentIds.map(studentId => 
+        this.sendNotification({
+          userId: studentId,
+          type: this.notificationTypes.LIVE_STREAM_ENDED,
+          title: 'Live Class Ended',
+          message: `${streamData.title} has ended. Recording will be available soon.`,
+          data: {
+            scheduleId: streamData.scheduleId,
+            recordingPlaybackId: streamData.recordingPlaybackId
+          },
+          priority: 'medium'
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      console.log(`Successfully notified ${studentIds.length} students about live stream end`);
+    } catch (error) {
+      console.error('Error notifying students about live stream end:', error);
+    }
+  }
+
+  /**
+   * Send recording available notification to students
+   * @param {string} batchId - Batch ID
+   * @param {Object} streamData - Live stream data with recording
+   */
+  async notifyRecordingAvailable(batchId, streamData) {
+    try {
+      console.log(`Notifying students for batch ${batchId} about recording: ${streamData.title}`);
+      
+      // Get all students enrolled in the batch
+      const enrollmentsSnapshot = await firestore
+        .collection('enrollments')
+        .where('batchId', '==', batchId)
+        .where('status', '==', 'active')
+        .get();
+
+      const studentIds = enrollmentsSnapshot.docs.map(doc => doc.data().studentId);
+      
+      if (studentIds.length === 0) {
+        console.log('No active students found for batch:', batchId);
+        return;
+      }
+
+      // Send notifications to all students
+      const notificationPromises = studentIds.map(studentId => 
+        this.sendNotification({
+          userId: studentId,
+          type: this.notificationTypes.RECORDING_AVAILABLE,
+          title: 'Class Recording Available',
+          message: `Recording of ${streamData.title} is now available to watch.`,
+          data: {
+            scheduleId: streamData.scheduleId,
+            recordingPlaybackId: streamData.recordingPlaybackId,
+            recordingAssetId: streamData.recordingAssetId
+          },
+          priority: 'low'
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      console.log(`Successfully notified ${studentIds.length} students about recording availability`);
+    } catch (error) {
+      console.error('Error notifying students about recording availability:', error);
+    }
+  }
+
+  /**
+   * Send live stream reminder to students
+   * @param {string} batchId - Batch ID
+   * @param {Object} streamData - Live stream data
+   * @param {number} minutesBefore - Minutes before the stream starts
+   */
+  async sendLiveStreamReminder(batchId, streamData, minutesBefore = 15) {
+    try {
+      console.log(`Sending ${minutesBefore}-minute reminder for: ${streamData.title}`);
+      
+      // Get all students enrolled in the batch
+      const enrollmentsSnapshot = await firestore
+        .collection('enrollments')
+        .where('batchId', '==', batchId)
+        .where('status', '==', 'active')
+        .get();
+
+      const studentIds = enrollmentsSnapshot.docs.map(doc => doc.data().studentId);
+      
+      if (studentIds.length === 0) {
+        console.log('No active students found for batch:', batchId);
+        return;
+      }
+
+      // Send notifications to all students
+      const notificationPromises = studentIds.map(studentId => 
+        this.sendNotification({
+          userId: studentId,
+          type: this.notificationTypes.LIVE_STREAM_REMINDER,
+          title: `Live Class Starting in ${minutesBefore} Minutes`,
+          message: `${streamData.title} will start soon. Get ready!`,
+          data: {
+            scheduleId: streamData.scheduleId,
+            scheduledAt: streamData.scheduledAt
+          },
+          priority: 'high'
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      console.log(`Successfully sent reminders to ${studentIds.length} students`);
+    } catch (error) {
+      console.error('Error sending live stream reminders:', error);
+    }
+  }
+
   async cleanupOldNotifications(daysOld = 30) {
     try {
       const cutoffDate = new Date();

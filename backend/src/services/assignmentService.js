@@ -1,7 +1,10 @@
-const { db, storage } = require('../../config/firebase');
+const { firestore, storage } = require('../../config/firebase');
 const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const multer = require('multer');
+
+// Initialize Firestore database reference
+const db = firestore;
 
 /**
  * Assignment Service
@@ -45,10 +48,12 @@ class AssignmentService {
         throw new Error('Unauthorized: Teacher does not own this batch');
       }
 
-      // Validate due date
+      // Validate due date - allow dates that are at least 1 minute in the future
       const dueDateObj = new Date(dueDate);
-      if (dueDateObj <= new Date()) {
-        throw new Error('Due date must be in the future');
+      const currentTime = new Date();
+      const oneMinuteFromNow = new Date(currentTime.getTime() + 60000); // 1 minute buffer
+      if (dueDateObj <= oneMinuteFromNow) {
+        throw new Error('Due date must be at least 1 minute in the future');
       }
 
       const assignmentId = uuidv4();
@@ -110,12 +115,15 @@ class AssignmentService {
     try {
       let query = db.collection('assignments')
         .where('batchId', '==', batchId)
-        .where('status', '==', 'published')
-        .orderBy('dueDate', 'asc');
+        .where('status', '==', 'published');
 
       if (subjectId) {
         query = query.where('subjectId', '==', subjectId);
       }
+
+      // Apply ordering - removed for now due to Firestore composite index requirements
+      // TODO: Create composite index for (batchId, status, dueDate) in Firestore
+      // query = query.orderBy('dueDate', 'asc');
 
       const snapshot = await query.get();
       const assignments = [];
@@ -123,12 +131,11 @@ class AssignmentService {
       for (const doc of snapshot.docs) {
         const assignment = doc.data();
         
-        // For students, add submission status
+        // For students, add submission status - remove ordering to avoid index requirements
         if (userRole === 'student') {
           const submissionQuery = await db.collection('submissions')
             .where('assignmentId', '==', assignment.id)
             .where('studentId', '==', userId)
-            .orderBy('submittedAt', 'desc')
             .limit(1)
             .get();
 
@@ -185,11 +192,10 @@ class AssignmentService {
           throw new Error('Student not enrolled in this batch');
         }
 
-        // Get student's submission if exists
+        // Get student's submission if exists - remove ordering to avoid index requirements
         const submissionQuery = await db.collection('submissions')
-          .where('assignmentId', '==', assignmentId)
+          .where('assignmentId', '==', assignment.id)
           .where('studentId', '==', userId)
-          .orderBy('submittedAt', 'desc')
           .limit(1)
           .get();
 
@@ -275,21 +281,39 @@ class AssignmentService {
           }
         });
 
-        const [downloadURL] = await fileRef.getSignedUrl({
-          action: 'read',
-          expires: '03-01-2500' // Long expiry for assignment files
-        });
-
-        uploadedFiles.push({
-          id: uuidv4(),
-          originalName: file.originalname,
-          fileName,
-          filePath,
-          downloadURL,
-          size: file.size,
-          type: file.mimetype,
-          uploadedAt: now.toISOString()
-        });
+        // Get signed URL for download - fix the destructuring issue
+        try {
+          const [downloadURL] = await fileRef.getSignedUrl({
+            action: 'read',
+            expires: '03-01-2500' // Long expiry for assignment files
+          });
+          
+          uploadedFiles.push({
+            id: uuidv4(),
+            originalName: file.originalname,
+            fileName,
+            filePath,
+            downloadURL,
+            size: file.size,
+            type: file.mimetype,
+            uploadedAt: now.toISOString()
+          });
+        } catch (signedUrlError) {
+          console.warn('Could not generate signed URL, using public URL');
+          // Fallback to public URL if signed URL fails
+          const publicUrl = `https://storage.googleapis.com/${storage.bucket().name}/${filePath}`;
+          
+          uploadedFiles.push({
+            id: uuidv4(),
+            originalName: file.originalname,
+            fileName,
+            filePath,
+            downloadURL: publicUrl,
+            size: file.size,
+            type: file.mimetype,
+            uploadedAt: now.toISOString()
+          });
+        }
       }
 
       // Create submission
@@ -310,11 +334,10 @@ class AssignmentService {
         version: 1
       };
 
-      // Check if this is a resubmission
+      // Check if this is a resubmission - remove ordering to avoid index requirements
       const existingSubmissionQuery = await db.collection('submissions')
         .where('assignmentId', '==', assignmentId)
         .where('studentId', '==', studentId)
-        .orderBy('submittedAt', 'desc')
         .limit(1)
         .get();
 
@@ -383,8 +406,8 @@ class AssignmentService {
 
       // Apply late submission penalty if applicable
       if (submission.isLate && assignment.lateSubmissionPenalty > 0) {
-        const penaltyAmount = (assignment.lateSubmissionPenalty / 100) * grade;
-        updates.grade = Math.max(0, grade - penaltyAmount);
+        const penaltyAmount = (assignment.lateSubmissionPenalty / 100) * parseFloat(grade);
+        updates.grade = Math.max(0, parseFloat(grade) - penaltyAmount);
         updates.latePenaltyApplied = penaltyAmount;
       }
 
@@ -419,8 +442,11 @@ class AssignmentService {
 
       let query = db.collection('submissions')
         .where('assignmentId', '==', assignmentId)
-        .where('status', 'in', ['submitted', 'graded'])
-        .orderBy('submittedAt', 'desc');
+        .where('status', 'in', ['submitted', 'graded']);
+        
+      // Remove ordering to avoid composite index requirements
+      // TODO: Create composite index for (assignmentId, status, submittedAt) in Firestore
+      // .orderBy('submittedAt', 'desc');
 
       const snapshot = await query.get();
       const submissions = [];

@@ -1,5 +1,6 @@
 const rateLimit = require('express-rate-limit');
-const { db } = require('../config/firebase');
+const { firestore } = require('../config/firebase');
+const db = firestore;
 
 /**
  * Rate limiting configurations for different endpoints
@@ -106,6 +107,43 @@ const rateLimitConfigs = {
         retryAfter: '1 hour'
       },
       timestamp: new Date().toISOString()
+    }
+  }),
+
+  // Admin endpoints - Higher limits for admin operations
+  admin: rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 500, // Limit each IP to 500 requests per 15 minutes for admin
+    message: {
+      success: false,
+      error: {
+        code: 'ADMIN_RATE_LIMIT_EXCEEDED',
+        message: 'Too many admin requests, please try again later.',
+        retryAfter: '15 minutes'
+      },
+      timestamp: new Date().toISOString()
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: async (req, res) => {
+      await logSecurityEvent({
+        type: 'ADMIN_RATE_LIMIT_EXCEEDED',
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        endpoint: req.originalUrl,
+        method: req.method,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.status(429).json({
+        success: false,
+        error: {
+          code: 'ADMIN_RATE_LIMIT_EXCEEDED',
+          message: 'Too many admin requests, please try again later.',
+          retryAfter: '15 minutes'
+        },
+        timestamp: new Date().toISOString()
+      });
     }
   })
 };

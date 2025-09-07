@@ -26,8 +26,19 @@ const analyticsRoutes = require('./routes/analytics');
 const reportRoutes = require('./src/routes/reports');
 const mobileRoutes = require('./src/routes/mobile');
 
+// Import new pw-extractor inspired routes
+const contentRoutes = require('./routes/content');
+const announcementRoutes = require('./routes/announcements');
+const dashboardRoutes = require('./routes/dashboard');
+const tokenRoutes = require('./routes/tokens');
+const trackingRoutes = require('./routes/tracking');
+const utilityRoutes = require('./routes/utilities');
+
 // Import Socket.io handler
 const chatSocketHandler = require('./src/socket/chatSocket');
+
+// Import services
+const schedulerService = require('./services/schedulerService');
 
 // Import Firebase Admin SDK
 const admin = require('firebase-admin');
@@ -37,6 +48,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Security middleware - Apply rate limiting first
+app.use('/api/admin/', rateLimitConfigs.admin); // Higher limits for admin operations
 app.use('/api/', rateLimitConfigs.general);
 app.use('/api/auth/', rateLimitConfigs.auth);
 app.use('/api/teacher/generate-upload-url', rateLimitConfigs.upload);
@@ -44,35 +56,72 @@ app.use('/api/teacher/generate-pdf-upload-url', rateLimitConfigs.upload);
 app.use('/api/student/batches/*/create-order', rateLimitConfigs.payment);
 app.use('/api/student/payment/verify', rateLimitConfigs.payment);
 
-// Apply audit logging to all requests
-app.use(auditMiddleware('API_REQUEST'));
+// Apply audit logging to all requests except webhooks
+app.use((req, res, next) => {
+  // Skip audit logging for webhook endpoints
+  if (req.path.startsWith('/api/webhooks/')) {
+    return next();
+  }
+  return auditMiddleware('API_REQUEST')(req, res, next);
+});
 
 // Apply anti-piracy detection to video-related routes
 app.use('/api/student/batches/*/content', antiPiracyDetection);
 app.use('/api/video/*', antiPiracyDetection);
 
-// CORS middleware
+// CORS middleware with enhanced security
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] // Replace with your production domain
-    : function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        
-        // Allow localhost and local network IPs
-        const allowedPatterns = [
-          /^http:\/\/localhost:\d+$/,
-          /^http:\/\/127\.0\.0\.1:\d+$/,
-          /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
-          /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
-          /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/
-        ];
-        
-        const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
-        callback(null, isAllowed);
-      },
-  credentials: true
+  origin: function (origin, callback) {
+    // In production, only allow specific domains
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    } else {
+      // Development: Allow localhost and local network IPs
+      if (!origin) return callback(null, true);
+      
+      const allowedPatterns = [
+        /^http:\/\/localhost:\d+$/,
+        /^https:\/\/localhost:\d+$/,
+        /^http:\/\/127\.0\.0\.1:\d+$/,
+        /^https:\/\/127\.0\.0\.1:\d+$/,
+        /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+        /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+        /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:\d+$/
+      ];
+      
+      const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
+      callback(null, isAllowed);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  maxAge: 86400 // 24 hours
 }));
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;");
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -170,6 +219,14 @@ app.use('/api/forum', forumRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/mobile', mobileRoutes);
+
+// Mount new pw-extractor inspired routes
+app.use('/api/content', contentRoutes);
+app.use('/api/announcements', announcementRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/tokens', tokenRoutes);
+app.use('/api/tracking', trackingRoutes);
+app.use('/api/utilities', utilityRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

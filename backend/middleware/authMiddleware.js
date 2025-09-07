@@ -38,7 +38,10 @@ const authMiddleware = async (req, res, next) => {
     try {
       // First try to decode as JWT token
       const jwt = require('jsonwebtoken');
-      const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+      const JWT_SECRET = process.env.JWT_SECRET;
+      if (!JWT_SECRET) {
+        throw new Error('JWT_SECRET environment variable is not set');
+      }
       decodedToken = jwt.verify(idToken, JWT_SECRET);
       isJWT = true;
       console.log('🔐 JWT token verified successfully');

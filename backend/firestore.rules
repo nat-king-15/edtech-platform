@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher']);
+    }
+    
+    // Courses collection
+    match /courses/{courseId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Batches collection
+    match /batches/{batchId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'];
+    }
+    
+    // Subjects collection
+    match /subjects/{subjectId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          resource.data.teacherId == request.auth.uid));
+    }
+    
+    // Chapters collection
+    match /chapters/{chapterId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          get(/databases/$(database)/documents/subjects/$(resource.data.subjectId)).data.teacherId == request.auth.uid));
+    }
+    
+    // Topics collection
+    match /topics/{topicId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          get(/databases/$(database)/documents/subjects/$(resource.data.subjectId)).data.teacherId == request.auth.uid));
+    }
+    
+    // Schedule collection
+    match /schedule/{scheduleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' &&
+          resource.data.teacherId == request.auth.uid));
+    }
+    
+    // Enrollments collection
+    match /enrollments/{enrollmentId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'student']);
+    }
+    
+    // Forum collection
+    match /forum/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'teacher'];
+    }
+    
+    // Chat collection
+    match /chat/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Default deny all other documents
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

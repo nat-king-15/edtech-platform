@@ -1,13 +1,16 @@
 const express = require('express');
-const admin = require('firebase-admin');
+const { admin, firestore, auth, FieldValue } = require('../config/firebase');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Initialize Firestore
-const db = admin.firestore();
+const db = firestore;
 
-// JWT Secret (should be in environment variables)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+// JWT Secret (must be in environment variables)
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for security');
+}
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
@@ -63,8 +66,8 @@ router.post('/register', async (req, res) => {
       email,
       displayName,
       role,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
       isActive: true,
       profile: {
         avatar: null,

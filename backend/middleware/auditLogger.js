@@ -1,4 +1,4 @@
-const { db } = require('../config/firebase');
+const { firestore } = require('../config/firebase');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -104,11 +104,11 @@ async function createAuditLog({
       createdAt: new Date()
     };
 
-    await db.collection('audit_logs').add(auditEntry);
+    await firestore.collection('audit_logs').add(auditEntry);
     
     // If high risk, also log to security collection
     if (riskLevel === RISK_LEVELS.HIGH || riskLevel === RISK_LEVELS.CRITICAL) {
-      await db.collection('security_alerts').add({
+      await firestore.collection('security_alerts').add({
         ...auditEntry,
         alertType: 'HIGH_RISK_ACTIVITY',
         reviewed: false,
@@ -190,7 +190,7 @@ const logAuditEvent = async (eventType, req, additionalData = {}) => {
  */
 const getAuditLogs = async (filters = {}) => {
   try {
-    let query = db.collection('audit_logs');
+    let query = firestore.collection('audit_logs');
     
     // Apply filters
     if (filters.userId) {
@@ -243,7 +243,7 @@ const getAuditLogs = async (filters = {}) => {
  */
 const getSecurityAlerts = async (filters = {}) => {
   try {
-    let query = db.collection('security_alerts');
+    let query = firestore.collection('security_alerts');
     
     if (filters.reviewed !== undefined) {
       query = query.where('reviewed', '==', filters.reviewed);

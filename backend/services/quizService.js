@@ -245,7 +245,7 @@ class QuizService {
           timeSpent: submission.timeSpent,
           passed: submission.percentage >= (quiz.settings?.passingScore || 60),
           showResults: quiz.settings?.showResults || true,
-          gradingDetails: quiz.settings?.showResults ? gradingDetails.details : null
+          gradingDetails: quiz.settings?.showResults ? gradingResult.details : null
         }
       };
     } catch (error) {
