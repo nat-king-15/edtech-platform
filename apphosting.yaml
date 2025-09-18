@@ -1,0 +1,58 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+env:
+  # Configure environment variables.
+  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
+  - variable: NODE_ENV
+    value: production
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: PORT
+    value: "5000"
+    availability:
+      - RUNTIME
+  - variable: JWT_EXPIRES_IN
+    value: 7d
+    availability:
+      - RUNTIME
+  - variable: RATE_LIMIT_WINDOW_MS
+    value: "900000"
+    availability:
+      - RUNTIME
+  - variable: RATE_LIMIT_MAX_REQUESTS
+    value: "100"
+    availability:
+      - RUNTIME
+  - variable: LOG_LEVEL
+    value: info
+    availability:
+      - RUNTIME
+
+  # Grant access to secrets in Cloud Secret Manager.
+  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+  # Uncomment and configure these secrets in Google Cloud Secret Manager
+  # - variable: JWT_SECRET
+  #   secret: jwt-secret
+  # - variable: EMAIL_USER
+  #   secret: email-user
+  # - variable: EMAIL_PASS
+  #   secret: email-pass
+  # - variable: MUX_TOKEN_ID
+  #   secret: mux-token-id
+  # - variable: MUX_TOKEN_SECRET
+  #   secret: mux-token-secret
+  # - variable: MUX_WEBHOOK_SECRET
+  #   secret: mux-webhook-secret
+  # - variable: RAZORPAY_KEY_ID
+  #   secret: razorpay-key-id
+  # - variable: RAZORPAY_KEY_SECRET
+  #   secret: razorpay-key-secret

@@ -24,9 +24,21 @@
         console.log('Token:', adminToken);
         console.log('User:', adminUser);
         
-        document.body.innerHTML += '<p>Admin token has been set in localStorage!</p>';
-        document.body.innerHTML += '<p>You can now close this tab and refresh your admin page.</p>';
-        document.body.innerHTML += '<p><a href="http://localhost:3000/admin/users" target="_blank">Go to Admin Users Page</a></p>';
+        const successMsg = document.createElement('p');
+        successMsg.textContent = 'Admin token has been set in localStorage!';
+        document.body.appendChild(successMsg);
+        
+        const instructionMsg = document.createElement('p');
+        instructionMsg.textContent = 'You can now close this tab and refresh your admin page.';
+        document.body.appendChild(instructionMsg);
+        
+        const linkMsg = document.createElement('p');
+        const link = document.createElement('a');
+        link.href = 'http://localhost:3000/admin/users';
+        link.target = '_blank';
+        link.textContent = 'Go to Admin Users Page';
+        linkMsg.appendChild(link);
+        document.body.appendChild(linkMsg);
     </script>
 </body>
 </html>
