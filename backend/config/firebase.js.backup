@@ -1,0 +1,57 @@
+const admin = require('firebase-admin');
+require('dotenv').config();
+
+// Initialize Firebase Admin SDK
+const initializeFirebase = () => {
+  try {
+    console.log('🚀 Initializing Firebase Admin SDK...');
+    
+    // Check if Firebase is already initialized
+    if (admin.apps.length === 0) {
+      const serviceAccount = {
+        type: "service_account",
+        project_id: process.env.FIREBASE_PROJECT_ID,
+        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+        private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: process.env.FIREBASE_CLIENT_EMAIL,
+        client_id: process.env.FIREBASE_CLIENT_ID,
+        auth_uri: process.env.FIREBASE_AUTH_URI,
+        token_uri: process.env.FIREBASE_TOKEN_URI,
+      };
+
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: process.env.FIREBASE_DATABASE_URL,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+      });
+      
+      console.log('✅ Firebase Admin SDK initialized successfully');
+    }
+
+    return admin;
+  } catch (error) {
+    console.error('❌ Error initializing Firebase Admin SDK:', error.message);
+    throw error;
+  }
+};
+
+// Initialize Firebase
+const firebaseAdmin = initializeFirebase();
+
+// Export Firebase services (conditionally include database if URL is provided)
+const exports = {
+  admin: firebaseAdmin,
+  auth: firebaseAdmin.auth(),
+  firestore: firebaseAdmin.firestore(),
+  storage: firebaseAdmin.storage(),
+  FieldValue: admin.firestore.FieldValue,
+  // Legacy exports for backward compatibility
+  db: firebaseAdmin.firestore()
+};
+
+// Only add database if URL is configured
+if (process.env.FIREBASE_DATABASE_URL) {
+  exports.database = firebaseAdmin.database();
+}
+
+module.exports = exports;

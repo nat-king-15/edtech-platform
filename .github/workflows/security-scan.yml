@@ -1,0 +1,145 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      - name: Run TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: snyk.sarif
+
+  env-file-check:
+    name: Environment File Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for .env files
+        run: |
+          if find . -name ".env*" -not -name "*.example" -not -path "./.git/*" | grep -q .; then
+            echo "ERROR: .env files found in repository!"
+            find . -name ".env*" -not -name "*.example" -not -path "./.git/*"
+            exit 1
+          else
+            echo "✅ No .env files found in repository"
+          fi
+
+      - name: Validate .env.example files
+        run: |
+          for file in $(find . -name "*.env.example"); do
+            echo "Checking $file for potential secrets..."
+            if grep -E "(sk_|pk_|AIza|ya29|AKIA|[0-9a-f]{32,})" "$file"; then
+              echo "ERROR: Potential real secrets found in $file"
+              exit 1
+            fi
+          done
+          echo "✅ All .env.example files contain only placeholders"
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies (Backend)
+        run: |
+          cd backend
+          npm ci
+
+      - name: Run npm audit (Backend)
+        run: |
+          cd backend
+          npm audit --audit-level=moderate
+
+      - name: Install dependencies (Frontend)
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run npm audit (Frontend)
+        run: |
+          cd frontend
+          npm audit --audit-level=moderate
+
+  code-quality:
+    name: Code Quality & Security
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install ESLint Security Plugin
+        run: npm install -g eslint eslint-plugin-security
+
+      - name: Run ESLint Security Check
+        run: |
+          cd backend
+          npx eslint . --ext .js --config .eslintrc.security.js || true
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten

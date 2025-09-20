@@ -1,6 +1,7 @@
 const { firestore } = require('../config/firebase');
 const admin = require('firebase-admin');
 const emailService = require('../utils/emailService');
+const fcmService = require('../utils/fcmService');
 
 /**
  * Notification Service
@@ -163,7 +164,7 @@ class NotificationService {
    */
   async sendNotification(userId, type, data = {}, options = {}) {
     try {
-      const { sendEmail = true, sendInApp = true } = options;
+      const { sendEmail = true, sendInApp = true, sendPush = true } = options;
       const results = {};
 
       // Get user details
@@ -213,8 +214,8 @@ class NotificationService {
             icon: inAppTemplate.icon,
             data: templateData,
             read: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+            updatedAt: admin.firestore.Timestamp.fromDate(new Date())
           };
 
           const notificationRef = await firestore.collection('notifications').add(notificationData);
@@ -222,6 +223,41 @@ class NotificationService {
         } catch (inAppError) {
           console.error('In-app notification failed:', inAppError);
           results.inApp = { success: false, error: inAppError.message };
+        }
+      }
+
+      // Send push notification
+      if (sendPush && this.templates[type]?.inApp) {
+        try {
+          const pushTemplate = this.templates[type].inApp;
+          const pushNotification = {
+            title: this.replaceTemplateVars(pushTemplate.title, templateData),
+            body: this.replaceTemplateVars(pushTemplate.body, templateData),
+            icon: pushTemplate.icon
+          };
+
+          // Get user's FCM tokens
+          const tokensResult = await fcmService.getUserTokens(userId);
+          if (tokensResult.success && tokensResult.tokens.length > 0) {
+            const tokens = tokensResult.tokens.map(t => t.token);
+            
+            const pushResult = await fcmService.sendToMultipleDevices(
+              tokens, 
+              pushNotification, 
+              {
+                type,
+                userId,
+                ...templateData
+              }
+            );
+            
+            results.push = pushResult;
+          } else {
+            results.push = { success: false, error: 'No FCM tokens found for user' };
+          }
+        } catch (pushError) {
+          console.error('Push notification failed:', pushError);
+          results.push = { success: false, error: pushError.message };
         }
       }
 
@@ -240,21 +276,25 @@ class NotificationService {
    * @param {Object} options - Additional options
    */
   async sendBulkNotification(userIds, type, data = {}, options = {}) {
-    const results = [];
-    const batchSize = 10; // Process in batches to avoid overwhelming the system
+    try {
+      const { sendEmail = true, sendInApp = true, sendPush = true } = options;
+      const results = [];
 
-    for (let i = 0; i < userIds.length; i += batchSize) {
-      const batch = userIds.slice(i, i + batchSize);
-      const batchPromises = batch.map(userId => 
-        this.sendNotification(userId, type, data, options)
-          .catch(error => ({ userId, error: error.message }))
-      );
+      for (const userId of userIds) {
+        try {
+          const result = await this.sendNotification(userId, type, data, { sendEmail, sendInApp, sendPush });
+          results.push({ userId, success: true, result });
+        } catch (error) {
+          console.error(`Failed to send notification to user ${userId}:`, error);
+          results.push({ userId, success: false, error: error.message });
+        }
+      }
 
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
+      return results;
+    } catch (error) {
+      console.error('Bulk notification error:', error);
+      throw error;
     }
-
-    return results;
   }
 
   /**
@@ -586,7 +626,7 @@ class NotificationService {
 
   async cleanupOldNotifications(daysOld = 30) {
     try {
-      const cutoffDate = new Date();
+      const cutoffDate = admin.firestore.Timestamp.fromDate(new Date());
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
       const oldNotifications = await firestore.collection('notifications')
@@ -602,6 +642,116 @@ class NotificationService {
       return { success: true, deletedCount: oldNotifications.size };
     } catch (error) {
       console.error('Error cleaning up notifications:', error);
+      throw error;
+    }
+  }
+  /**
+   * Store FCM token for a user
+   * @param {string} userId - User ID
+   * @param {string} token - FCM token
+   * @param {string} deviceType - Device type (web, android, ios)
+   */
+  async storeFCMToken(userId, token, deviceType = 'web') {
+    try {
+      return await fcmService.storeUserToken(userId, token, deviceType);
+    } catch (error) {
+      console.error('Error storing FCM token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove FCM token for a user
+   * @param {string} token - FCM token to remove
+   */
+  async removeFCMToken(token) {
+    try {
+      return await fcmService.removeInvalidToken(token);
+    } catch (error) {
+      console.error('Error removing FCM token:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Subscribe user to notification topics
+   * @param {string} userId - User ID
+   * @param {Array} topics - Array of topic names
+   */
+  async subscribeToTopics(userId, topics) {
+    try {
+      const tokensResult = await fcmService.getUserTokens(userId);
+      if (!tokensResult.success || tokensResult.tokens.length === 0) {
+        return { success: false, error: 'No FCM tokens found for user' };
+      }
+
+      const tokens = tokensResult.tokens.map(t => t.token);
+      const results = [];
+
+      for (const topic of topics) {
+        const result = await fcmService.subscribeToTopic(tokens, topic);
+        results.push({ topic, ...result });
+      }
+
+      return { success: true, results };
+    } catch (error) {
+      console.error('Error subscribing to topics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unsubscribe user from notification topics
+   * @param {string} userId - User ID
+   * @param {Array} topics - Array of topic names
+   */
+  async unsubscribeFromTopics(userId, topics) {
+    try {
+      const tokensResult = await fcmService.getUserTokens(userId);
+      if (!tokensResult.success || tokensResult.tokens.length === 0) {
+        return { success: false, error: 'No FCM tokens found for user' };
+      }
+
+      const tokens = tokensResult.tokens.map(t => t.token);
+      const results = [];
+
+      for (const topic of topics) {
+        const result = await fcmService.unsubscribeFromTopic(tokens, topic);
+        results.push({ topic, ...result });
+      }
+
+      return { success: true, results };
+    } catch (error) {
+      console.error('Error unsubscribing from topics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send notification to a topic
+   * @param {string} topic - Topic name
+   * @param {string} type - Notification type
+   * @param {Object} data - Template data
+   */
+  async sendTopicNotification(topic, type, data = {}) {
+    try {
+      if (!this.templates[type]?.inApp) {
+        throw new Error(`No template found for notification type: ${type}`);
+      }
+
+      const template = this.templates[type].inApp;
+      const notification = {
+        title: this.replaceTemplateVars(template.title, data),
+        body: this.replaceTemplateVars(template.body, data),
+        icon: template.icon
+      };
+
+      return await fcmService.sendToTopic(topic, notification, {
+        type,
+        ...data
+      });
+    } catch (error) {
+      console.error('Error sending topic notification:', error);
       throw error;
     }
   }

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const admin = require('firebase-admin');
 const { authMiddleware: requireAuth, requireRole, requireTeacherOrAdmin } = require('../middleware/authMiddleware');
 const utilityService = require('../services/utilityService');
 const { body, param, query, validationResult } = require('express-validator');
@@ -443,7 +444,7 @@ router.post('/format-datetime',
     try {
       const { date, format, timezone } = req.body;
       
-      const result = await utilityService.formatDateTime(new Date(date), format, timezone);
+      const result = await utilityService.formatDateTime(admin.firestore.Timestamp.fromDate(new Date(date)), format, timezone);
       
       if (result.success) {
         res.json({
@@ -480,7 +481,7 @@ router.post('/time-difference',
     try {
       const { startDate, endDate, unit = 'minutes' } = req.body;
       
-      const result = await utilityService.getTimeDifference(new Date(startDate), new Date(endDate), unit);
+      const result = await utilityService.getTimeDifference(admin.firestore.Timestamp.fromDate(new Date(startDate)), admin.firestore.Timestamp.fromDate(new Date(endDate)), unit);
       
       if (result.success) {
         res.json({
@@ -669,7 +670,7 @@ router.get('/health',
       res.json({
         success: true,
         status: 'healthy',
-        timestamp: new Date().toISOString(),
+        timestamp: admin.firestore.Timestamp.fromDate(new Date()),
         services: {
           database: 'connected',
           memory: {
@@ -685,7 +686,7 @@ router.get('/health',
         success: false,
         status: 'unhealthy',
         error_message: 'Service unavailable',
-        timestamp: new Date().toISOString()
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
     }
   }

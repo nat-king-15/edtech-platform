@@ -1,4 +1,5 @@
 const { firestore } = require('../config/firebase');
+const admin = require('firebase-admin');
 const notificationService = require('./notificationService');
 const fs = require('fs').promises;
 const path = require('path');
@@ -314,7 +315,7 @@ class AnnouncementService {
       await this.db.collection('user_announcement_reads').doc(`${userId}_${announcementId}`).set({
         userId: userId,
         announcementId: announcementId,
-        readAt: new Date(),
+        readAt: admin.firestore.Timestamp.fromDate(new Date()),
         isRead: true
       }, { merge: true });
 
@@ -381,9 +382,9 @@ class AnnouncementService {
       const announcement = {
         ...announcementData,
         createdBy: creatorId,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        scheduleTime: announcementData.scheduleTime || new Date(),
+        createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date()),
+        scheduleTime: announcementData.scheduleTime ? admin.firestore.Timestamp.fromDate(new Date(announcementData.scheduleTime)) : admin.firestore.Timestamp.fromDate(new Date()),
         priority: announcementData.priority || 'normal',
         type: announcementData.type || 'general'
       };

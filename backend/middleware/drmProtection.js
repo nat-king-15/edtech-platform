@@ -26,7 +26,7 @@ const DRM_CONFIG = {
 /**
  * Generate secure video access token
  */
-const generateVideoToken = async (userId, videoId, batchId, additionalClaims = {}) => {
+const generateVideoToken = async (req, userId, videoId, batchId, additionalClaims = {}) => {
   try {
     // Check user enrollment
     const enrollment = await db.collection('enrollments')
@@ -51,12 +51,17 @@ const generateVideoToken = async (userId, videoId, batchId, additionalClaims = {
       throw new Error('Daily view limit exceeded');
     }
     
+    // Generate deterministic device fingerprint with issued hour for consistency
+    const issuedHour = Math.floor(Date.now() / (1000 * 60 * 60));
+    const deviceFingerprint = generateDeviceFingerprint(req, issuedHour);
+    
     const tokenPayload = {
       userId,
       videoId,
       batchId,
       sessionId: crypto.randomUUID(),
-      deviceFingerprint: generateDeviceFingerprint(),
+      deviceFingerprint,
+      issuedHour, // Store the hour used for fingerprint generation
       watermarkData: {
         userId,
         timestamp: Date.now(),
@@ -85,7 +90,8 @@ const generateVideoToken = async (userId, videoId, batchId, additionalClaims = {
       createdAt: new Date(),
       expiresAt: new Date(Date.now() + DRM_CONFIG.VIDEO_TOKEN_EXPIRY * 1000),
       active: true,
-      deviceFingerprint: tokenPayload.deviceFingerprint
+      deviceFingerprint: tokenPayload.deviceFingerprint,
+      issuedHour: tokenPayload.issuedHour
     });
     
     return {
@@ -149,8 +155,8 @@ const verifyVideoToken = async (req, res, next) => {
       });
     }
     
-    // Verify device fingerprint
-    const currentFingerprint = generateDeviceFingerprint(req);
+    // Verify device fingerprint using the same issuedHour from token
+    const currentFingerprint = generateDeviceFingerprint(req, decoded.issuedHour);
     if (decoded.deviceFingerprint !== currentFingerprint) {
       await logAuditEvent(AUDIT_EVENTS.SUSPICIOUS_ACTIVITY, req, {
         reason: 'Device fingerprint mismatch',
@@ -205,24 +211,24 @@ const verifyVideoToken = async (req, res, next) => {
 };
 
 /**
- * Generate device fingerprint
+ * Generate device fingerprint for DRM protection
+ * Now accepts req object and optional issuedHour for deterministic fingerprinting
  */
-const generateDeviceFingerprint = (req = null) => {
-  const components = [];
+const generateDeviceFingerprint = (req, issuedHour = null) => {
+  const userAgent = req.headers['user-agent'] || 'unknown';
+  const acceptLanguage = req.headers['accept-language'] || 'unknown';
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
   
-  if (req) {
-    components.push(req.get('User-Agent') || '');
-    components.push(req.get('Accept-Language') || '');
-    components.push(req.ip || '');
-  }
+  // Use provided issuedHour for deterministic fingerprinting during token lifetime
+  // If not provided, use current hour (for backward compatibility)
+  const timeComponent = issuedHour !== null ? issuedHour : Math.floor(Date.now() / (1000 * 60 * 60));
   
-  // Add timestamp component to make fingerprint time-sensitive
-  const timeComponent = Math.floor(Date.now() / (1000 * 60 * 60)); // Hour-based
-  components.push(timeComponent.toString());
-  
-  return crypto.createHash('sha256')
-    .update(components.join('|'))
+  const fingerprint = crypto
+    .createHash('sha256')
+    .update(`${userAgent}:${acceptLanguage}:${ip}:${timeComponent}`)
     .digest('hex');
+  
+  return fingerprint;
 };
 
 /**
@@ -387,6 +393,7 @@ module.exports = {
   DRM_CONFIG,
   generateVideoToken,
   verifyVideoToken,
+  generateDeviceFingerprint,
   recordVideoView,
   terminateVideoSession,
   antiPiracyDetection,

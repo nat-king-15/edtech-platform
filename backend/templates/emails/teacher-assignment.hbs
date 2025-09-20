@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Assignment - {{platformName}}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .assignment-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin: 20px 0;
+        }
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #495057;
+            min-width: 120px;
+        }
+        .detail-value {
+            color: #212529;
+            flex: 1;
+            text-align: right;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cta-button:hover {
+            background-color: #0056b3;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .urgent {
+            background-color: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .high-priority {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+            .detail-row {
+                flex-direction: column;
+            }
+            .detail-value {
+                text-align: left;
+                margin-top: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{platformName}}</div>
+            <h1 class="title">New Assignment</h1>
+            <p class="subtitle">You have been assigned a new task</p>
+        </div>
+
+        <div class="content">
+            <p>Dear {{capitalize teacherName}},</p>
+            
+            <p>You have been assigned a new assignment. Please review the details below and take the necessary action.</p>
+
+            <div class="assignment-details {{#ifEquals priority 'urgent'}}urgent{{/ifEquals}}{{#ifEquals priority 'high'}}high-priority{{/ifEquals}}">
+                <div class="detail-row">
+                    <span class="detail-label">Assignment:</span>
+                    <span class="detail-value">{{assignmentTitle}}</span>
+                </div>
+                
+                {{#if courseName}}
+                <div class="detail-row">
+                    <span class="detail-label">Course:</span>
+                    <span class="detail-value">{{courseName}}</span>
+                </div>
+                {{/if}}
+
+                {{#if batchName}}
+                <div class="detail-row">
+                    <span class="detail-label">Batch:</span>
+                    <span class="detail-value">{{batchName}}</span>
+                </div>
+                {{/if}}
+
+                {{#if dueDate}}
+                <div class="detail-row">
+                    <span class="detail-label">Due Date:</span>
+                    <span class="detail-value">{{formatDate dueDate}}</span>
+                </div>
+                {{/if}}
+
+                {{#if priority}}
+                <div class="detail-row">
+                    <span class="detail-label">Priority:</span>
+                    <span class="detail-value">{{capitalize priority}}</span>
+                </div>
+                {{/if}}
+
+                {{#if estimatedHours}}
+                <div class="detail-row">
+                    <span class="detail-label">Estimated Time:</span>
+                    <span class="detail-value">{{estimatedHours}} hours</span>
+                </div>
+                {{/if}}
+            </div>
+
+            {{#if description}}
+            <div style="margin: 20px 0;">
+                <h3 style="color: #495057; margin-bottom: 10px;">Description:</h3>
+                <p style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 0;">{{description}}</p>
+            </div>
+            {{/if}}
+
+            {{#if requirements}}
+            <div style="margin: 20px 0;">
+                <h3 style="color: #495057; margin-bottom: 10px;">Requirements:</h3>
+                <ul style="background-color: #f8f9fa; padding: 15px 15px 15px 35px; border-radius: 5px; margin: 0;">
+                    {{#each requirements}}
+                    <li style="margin-bottom: 5px;">{{this}}</li>
+                    {{/each}}
+                </ul>
+            </div>
+            {{/if}}
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{baseUrl}}/teacher/assignments/{{assignmentId}}" class="cta-button">View Assignment Details</a>
+            </div>
+
+            <p>If you have any questions or need clarification, please don't hesitate to contact the administration team.</p>
+
+            <p>Best regards,<br>
+            <strong>{{platformName}} Team</strong></p>
+        </div>
+
+        <div class="footer">
+            <p>This is an automated message from {{platformName}}.</p>
+            <p>If you need assistance, contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <p>&copy; {{currentYear}} {{platformName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

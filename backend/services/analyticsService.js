@@ -1,5 +1,6 @@
 const { db } = require('../config/firebase');
 const { FieldValue } = require('firebase-admin/firestore');
+const admin = require('firebase-admin');
 
 class AnalyticsService {
   // Student Analytics
@@ -39,7 +40,7 @@ class AnalyticsService {
         videos: videoData,
         forum: forumData,
         timeRange,
-        generatedAt: new Date()
+        generatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
     } catch (error) {
       console.error('Error getting student analytics:', error);
@@ -74,7 +75,7 @@ class AnalyticsService {
         engagement: engagementData,
         content: contentData,
         timeRange,
-        generatedAt: new Date()
+        generatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
     } catch (error) {
       console.error('Error getting teacher analytics:', error);
@@ -109,7 +110,7 @@ class AnalyticsService {
         revenue: revenueMetrics,
         system: systemMetrics,
         timeRange,
-        generatedAt: new Date()
+        generatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
     } catch (error) {
       console.error('Error getting admin analytics:', error);
@@ -119,7 +120,7 @@ class AnalyticsService {
   
   // Helper Methods
   getStartDate(timeRange) {
-    const now = new Date();
+    const now = admin.firestore.Timestamp.fromDate(new Date());
     const ranges = {
       '7d': 7,
       '30d': 30,
@@ -128,7 +129,9 @@ class AnalyticsService {
     };
     
     const days = ranges[timeRange] || 30;
-    return new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+    const startDate = admin.firestore.Timestamp.fromDate(new Date());
+    startDate.toDate().setTime(now.toDate().getTime() - (days * 24 * 60 * 60 * 1000));
+    return startDate;
   }
   
   async getStudentProgress(studentId, batchId, startDate) {
@@ -136,7 +139,7 @@ class AnalyticsService {
       const progressRef = db.collection('progress')
         .where('studentId', '==', studentId)
         .where('batchId', '==', batchId)
-        .where('updatedAt', '>=', startDate);
+        .where('updatedAt', '>=', startDate.toDate());
       
       const progressSnapshot = await progressRef.get();
       const progressData = [];
@@ -168,7 +171,7 @@ class AnalyticsService {
       const submissionsRef = db.collection('assignmentSubmissions')
         .where('studentId', '==', studentId)
         .where('batchId', '==', batchId)
-        .where('submittedAt', '>=', startDate);
+        .where('submittedAt', '>=', startDate.toDate());
       
       const submissionsSnapshot = await submissionsRef.get();
       const submissions = [];
@@ -205,7 +208,7 @@ class AnalyticsService {
       const attemptsRef = db.collection('quizAttempts')
         .where('studentId', '==', studentId)
         .where('batchId', '==', batchId)
-        .where('completedAt', '>=', startDate);
+        .where('completedAt', '>=', startDate.toDate());
       
       const attemptsSnapshot = await attemptsRef.get();
       const attempts = [];
@@ -238,7 +241,7 @@ class AnalyticsService {
       const videoProgressRef = db.collection('videoProgress')
         .where('studentId', '==', studentId)
         .where('batchId', '==', batchId)
-        .where('lastWatched', '>=', startDate);
+        .where('lastWatched', '>=', startDate.toDate());
       
       const videoProgressSnapshot = await videoProgressRef.get();
       const videoProgress = [];
@@ -270,7 +273,7 @@ class AnalyticsService {
       const topicsRef = db.collection('forumTopics')
         .where('authorId', '==', studentId)
         .where('batchId', '==', batchId)
-        .where('createdAt', '>=', startDate);
+        .where('createdAt', '>=', startDate.toDate());
       
       const topicsSnapshot = await topicsRef.get();
       const topicsCreated = topicsSnapshot.size;
@@ -278,7 +281,7 @@ class AnalyticsService {
       // Get forum replies by student
       const repliesRef = db.collection('forumReplies')
         .where('authorId', '==', studentId)
-        .where('createdAt', '>=', startDate);
+        .where('createdAt', '>=', startDate.toDate());
       
       const repliesSnapshot = await repliesRef.get();
       const repliesPosted = repliesSnapshot.size;
@@ -354,7 +357,7 @@ class AnalyticsService {
         // Get active students (those with recent activity)
         const activeStudentsRef = db.collection('progress')
           .where('batchId', '==', batchId)
-          .where('updatedAt', '>=', startDate);
+          .where('updatedAt', '>=', startDate.toDate());
         
         const activeStudentsSnapshot = await activeStudentsRef.get();
         const activeStudentIds = new Set();

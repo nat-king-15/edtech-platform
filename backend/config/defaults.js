@@ -10,122 +10,66 @@
  */
 
 const defaultSettings = {
-  // Application Configuration
+  // Application Settings
   appName: "Educaty",
   appDescription: "Modern EdTech Platform for Online Learning",
   appVersion: "1.0.0",
-  
-  // System Settings
   maintenanceMode: false,
   maintenanceMessage: "We are currently performing scheduled maintenance. Please check back soon.",
   
-  // Payment Configuration
-  razorpayKeyId: process.env.RAZORPAY_KEY_ID || "",
-  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || "",
-  paymentEnabled: true,
-  
-  // Email Configuration
-  emailEnabled: true,
-  smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
-  smtpPort: parseInt(process.env.SMTP_PORT) || 587,
-  smtpUser: process.env.SMTP_USER || "",
-  smtpPassword: process.env.SMTP_PASSWORD || "",
-  
-  // File Upload Settings
+  // System Settings
   maxFileSize: 50 * 1024 * 1024, // 50MB in bytes
   allowedFileTypes: [".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".mp4", ".mov", ".avi"],
+  sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+  
+  // Payment Settings
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID || "",
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET || "",
+  paymentGatewayEnabled: true,
+  
+  // Email Settings
+  emailFrom: process.env.SMTP_USER || "noreply@educaty.com",
+  emailReplyTo: process.env.SMTP_USER || "support@educaty.com",
+  smtpHost: process.env.SMTP_HOST || "smtp.gmail.com",
+  smtpPort: parseInt(process.env.SMTP_PORT) || 587,
+  smtpSecure: false,
   
   // Course Settings
-  maxCoursesPerBatch: 100,
-  maxStudentsPerBatch: 1000,
   defaultCourseDuration: 30, // days
+  maxStudentsPerBatch: 1000,
+  allowSelfEnrollment: true,
   
   // User Settings
-  maxLoginAttempts: 5,
-  sessionTimeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+  requireEmailVerification: true,
   passwordMinLength: 8,
+  allowSocialLogin: false,
   
   // Notification Settings
-  emailNotificationsEnabled: true,
-  pushNotificationsEnabled: true,
-  smsNotificationsEnabled: false,
+  enableEmailNotifications: true,
+  enablePushNotifications: true,
+  notificationRetentionDays: 30,
   
   // Content Settings
-  videoQuality: "720p",
-  autoPlayVideos: false,
-  downloadEnabled: true,
+  videoQualityOptions: ["360p", "480p", "720p", "1080p"],
+  enableVideoDownload: true,
+  contentCacheExpiry: 5 * 60 * 1000, // 5 minutes
   
   // Security Settings
-  twoFactorAuthEnabled: false,
-  ipWhitelistEnabled: false,
-  rateLimitEnabled: true,
-  rateLimitRequests: 100,
-  rateLimitWindow: 15 * 60 * 1000, // 15 minutes
+  enableTwoFactorAuth: false,
+  loginAttemptLimit: 5,
+  accountLockoutDuration: 15 * 60 * 1000, // 15 minutes
   
-  // Analytics Settings
-  analyticsEnabled: true,
-  trackingEnabled: true,
-  
-  // Social Media Links
-  socialMedia: {
-    facebook: "",
-    twitter: "",
-    instagram: "",
-    linkedin: "",
-    youtube: ""
-  },
+  // UI Settings
+  defaultTheme: "light",
+  enableDarkMode: true,
+  primaryColor: "#3B82F6", // blue-500
+  secondaryColor: "#10B981", // green-500
   
   // Contact Information
-  contactInfo: {
-    email: "support@educaty.com",
-    phone: "+1-234-567-8900",
-    address: "123 Education Street, Learning City, LC 12345",
-    supportHours: "Monday - Friday, 9 AM - 6 PM"
-  },
-  
-  // Feature Flags
-  features: {
-    liveStreaming: true,
-    assignments: true,
-    quizzes: true,
-    certificates: true,
-    discussions: true,
-    calendar: true,
-    reports: true
-  },
-  
-  // UI Customization
-  theme: {
-    primaryColor: "#3B82F6", // blue-500
-    secondaryColor: "#10B981", // green-500
-    accentColor: "#F59E0B", // yellow-500
-    backgroundColor: "#F9FAFB", // gray-50
-    textColor: "#111827", // gray-900
-    logoUrl: "",
-    faviconUrl: ""
-  },
-  
-  // API Configuration
-  apiSettings: {
-    timeout: 30000, // 30 seconds
-    retryAttempts: 3,
-    cacheEnabled: true,
-    cacheDuration: 5 * 60 * 1000 // 5 minutes
-  },
-  
-  // Backup Settings
-  backupEnabled: true,
-  backupFrequency: "daily", // daily, weekly, monthly
-  backupRetention: 30, // days
-  
-  // Logging Settings
-  logLevel: "info", // error, warn, info, debug
-  logRetention: 90, // days
-  
-  // Performance Settings
-  cacheEnabled: true,
-  compressionEnabled: true,
-  minifyAssets: true,
+  contactEmail: "support@educaty.com",
+  contactPhone: "+1-234-567-8900",
+  contactAddress: "123 Education Street, Learning City, LC 12345",
+  supportUrl: "https://educaty.com/support",
   
   // Timestamps
   createdAt: new Date().toISOString(),
@@ -141,10 +85,11 @@ function getDefaultSettings() {
     ...defaultSettings,
     // Override with environment variables if available
     razorpayKeyId: process.env.RAZORPAY_KEY_ID || defaultSettings.razorpayKeyId,
+    emailFrom: process.env.SMTP_USER || defaultSettings.emailFrom,
+    emailReplyTo: process.env.SMTP_USER || defaultSettings.emailReplyTo,
     smtpHost: process.env.SMTP_HOST || defaultSettings.smtpHost,
     smtpPort: parseInt(process.env.SMTP_PORT) || defaultSettings.smtpPort,
-    smtpUser: process.env.SMTP_USER || defaultSettings.smtpUser,
-    smtpPassword: process.env.SMTP_PASSWORD || defaultSettings.smtpPassword
+    updatedAt: new Date().toISOString()
   };
 }
 

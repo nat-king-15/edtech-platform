@@ -66,6 +66,16 @@ const checkEnrollment = async (studentId, batchId) => {
  */
 router.post('/batches/:batchId/create-order', authMiddleware, requireStudent, async (req, res) => {
   try {
+    // Check if Razorpay is available
+    if (!razorpay.isRazorpayAvailable()) {
+      const status = razorpay.getRazorpayStatus();
+      return res.status(503).json({
+        error: 'Payment Service Unavailable',
+        message: 'Payment processing is currently disabled. Please contact support.',
+        details: status.error
+      });
+    }
+
     const { batchId } = req.params;
     
     // Check if batch exists and is published
@@ -104,7 +114,7 @@ router.post('/batches/:batchId/create-order', authMiddleware, requireStudent, as
     const options = {
       amount: amountInPaise, // amount in paise
       currency: 'INR',
-      receipt: `receipt_order_${new Date().getTime()}`,
+      receipt: `receipt_order_${admin.firestore.Timestamp.fromDate(new Date()).toDate().getTime()}`,
       notes: {
         batchId: batchId,
         studentId: studentId,
@@ -143,12 +153,17 @@ router.post('/batches/:batchId/create-order', authMiddleware, requireStudent, as
  */
 router.post('/payment/verify', authMiddleware, requireStudent, async (req, res) => {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      batchId
-    } = req.body;
+    // Check if Razorpay is available
+    if (!razorpay.isRazorpayAvailable()) {
+      const status = razorpay.getRazorpayStatus();
+      return res.status(503).json({
+        error: 'Payment Service Unavailable',
+        message: 'Payment verification is currently disabled. Please contact support.',
+        details: status.error
+      });
+    }
+
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, batchId } = req.body;
     
     // Validate required fields
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !batchId) {
@@ -196,13 +211,35 @@ router.post('/payment/verify', authMiddleware, requireStudent, async (req, res) 
     
     const batchData = batchDoc.data();
     
+    // Fetch payment details from Razorpay and validate amount
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+    const expectedAmountInPaise = Math.round(batchData.price * 100);
+    
+    if (payment.amount !== expectedAmountInPaise) {
+      return res.status(400).json({
+        error: 'Payment Amount Mismatch',
+        message: `Payment amount (₹${payment.amount / 100}) does not match batch price (₹${batchData.price})`
+      });
+    }
+    
+    if (payment.currency !== 'INR') {
+      return res.status(400).json({
+        error: 'Invalid Currency',
+        message: 'Payment currency must be INR'
+      });
+    }
+    
+    // Validated amount in rupees for notifications and enrollment
+    const validatedAmount = payment.amount / 100;
+    
     // Create enrollment record
     const enrollmentData = {
       studentId,
       batchId,
       enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
       paymentStatus: 'completed',
-      amount: batchData.price || 0,
+      status: 'active',
+      amount: validatedAmount,
       currency: 'INR',
       razorpay_order_id,
       razorpay_payment_id,
@@ -221,7 +258,7 @@ router.post('/payment/verify', authMiddleware, requireStudent, async (req, res) 
           batchName: batchData.name,
           courseName: batchData.courseName || 'Course',
           startDate: batchData.startDate || 'TBD',
-          amount: (order.amount / 100).toString() // Convert from paise to rupees
+          amount: validatedAmount.toString() // Use validated amount in rupees
         }
       );
       
@@ -231,9 +268,9 @@ router.post('/payment/verify', authMiddleware, requireStudent, async (req, res) 
         notificationService.notificationTypes.PAYMENT_SUCCESS,
         {
           batchName: batchData.name,
-          amount: (order.amount / 100).toString(), // Convert from paise to rupees
+          amount: validatedAmount.toString(), // Use validated amount in rupees
           paymentId: razorpay_payment_id,
-          paymentDate: new Date().toLocaleDateString('en-IN')
+          paymentDate: admin.firestore.Timestamp.fromDate(new Date()).toDate().toLocaleDateString('en-IN')
         }
       );
       
@@ -251,7 +288,7 @@ router.post('/payment/verify', authMiddleware, requireStudent, async (req, res) 
         batchId,
         batchName: batchData.name,
         paymentId: razorpay_payment_id,
-        enrolledAt: new Date().toISOString()
+        enrolledAt: admin.firestore.Timestamp.fromDate(new Date())
       }
     });
     
@@ -311,6 +348,7 @@ router.post('/batches/:batchId/enroll', authMiddleware, requireStudent, async (r
       batchId,
       enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
       paymentStatus: 'completed', // Simulated
+      status: 'active',
       amount: batchData.price || 0,
       currency: batchData.currency || 'USD'
     };
@@ -324,7 +362,7 @@ router.post('/batches/:batchId/enroll', authMiddleware, requireStudent, async (r
         enrollmentId,
         batchId,
         batchName: batchData.name,
-        enrolledAt: new Date().toISOString()
+        enrolledAt: admin.firestore.Timestamp.fromDate(new Date())
       }
     });
     
@@ -489,7 +527,7 @@ router.get('/batches/:batchId/content', authMiddleware, requireStudent, async (r
         batchId,
         subjects,
         totalContent: scheduleSnapshot.size,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: admin.firestore.Timestamp.fromDate(new Date())
       }
     });
     
@@ -562,18 +600,19 @@ router.get('/notifications/unread-count', authMiddleware, requireStudent, async 
   }
 });
 
-/**
- * Mark a specific notification as read
- * PUT /api/student/notifications/:notificationId/read
- */
+// DEPRECATED: Use PUT /api/notifications/:id/read instead
+// This endpoint is kept for backward compatibility but will be removed in future versions
 router.put('/notifications/:notificationId/read', authMiddleware, requireStudent, async (req, res) => {
   try {
     const { notificationId } = req.params;
     
     if (!notificationId) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'Notification ID is required'
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Notification ID is required'
+        }
       });
     }
 
@@ -588,21 +627,30 @@ router.put('/notifications/:notificationId/read', authMiddleware, requireStudent
     
     if (error.message === 'Notification not found') {
       return res.status(404).json({
-        error: 'Not Found',
-        message: 'Notification not found'
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Notification not found'
+        }
       });
     }
     
     if (error.message === 'Unauthorized access to notification') {
       return res.status(403).json({
-        error: 'Forbidden',
-        message: 'You can only mark your own notifications as read'
+        success: false,
+        error: {
+          code: 'ACCESS_DENIED',
+          message: 'You can only mark your own notifications as read'
+        }
       });
     }
     
     res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to mark notification as read'
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to mark notification as read'
+      }
     });
   }
 });
@@ -610,6 +658,7 @@ router.put('/notifications/:notificationId/read', authMiddleware, requireStudent
 /**
  * Mark all notifications as read for the authenticated student
  * PUT /api/student/notifications/mark-all-read
+ * @deprecated Use PUT /api/notifications/mark-all-read instead
  */
 router.put('/notifications/mark-all-read', authMiddleware, requireStudent, async (req, res) => {
   try {
@@ -620,13 +669,18 @@ router.put('/notifications/mark-all-read', authMiddleware, requireStudent, async
       message: `${result.updatedCount} notifications marked as read`,
       data: {
         updatedCount: result.updatedCount
-      }
+      },
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Failed to mark all notifications as read'
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to mark all notifications as read'
+      },
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -991,11 +1045,13 @@ router.get('/quizzes/:quizId/results', authMiddleware, requireStudent, async (re
 
 
 
+// DEPRECATED: Use PUT /api/notifications/:id/read instead
+// This endpoint is kept for backward compatibility but will be removed in future versions
 /**
  * @swagger
  * /api/student/notifications/{notificationId}/read:
  *   post:
- *     summary: Mark notification as read
+ *     summary: Mark notification as read (Deprecated - Use PUT /api/notifications/:id/read)
  *     tags: [Student]
  *     security:
  *       - bearerAuth: []
@@ -1028,10 +1084,16 @@ router.post('/notifications/:notificationId/read',
       const { notificationId } = req.params;
       const studentId = req.user.uid;
 
-      // Check if notification exists and belongs to student
-      const notificationDoc = await firestore.collection('notifications').doc(notificationId).get();
+      await notificationService.markAsRead(notificationId, studentId);
+
+      res.json({
+        success: true,
+        message: 'Notification marked as read'
+      });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
       
-      if (!notificationDoc.exists) {
+      if (error.message === 'Notification not found') {
         return res.status(404).json({
           success: false,
           error: {
@@ -1040,9 +1102,8 @@ router.post('/notifications/:notificationId/read',
           }
         });
       }
-
-      const notificationData = notificationDoc.data();
-      if (notificationData.userId !== studentId) {
+      
+      if (error.message === 'Unauthorized access to notification') {
         return res.status(403).json({
           success: false,
           error: {
@@ -1051,19 +1112,7 @@ router.post('/notifications/:notificationId/read',
           }
         });
       }
-
-      // Mark as read
-      await firestore.collection('notifications').doc(notificationId).update({
-        read: true,
-        readAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      res.json({
-        success: true,
-        message: 'Notification marked as read'
-      });
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+      
       res.status(500).json({
         success: false,
         error: {

@@ -33,6 +33,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const tokenRoutes = require('./routes/tokens');
 const trackingRoutes = require('./routes/tracking');
 const utilityRoutes = require('./routes/utilities');
+const notificationRoutes = require('./routes/notifications');
 
 // Import Socket.io handler
 const chatSocketHandler = require('./src/socket/chatSocket');
@@ -122,6 +123,11 @@ app.use((req, res, next) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;");
   next();
 });
+
+// Register webhook routes with raw parser BEFORE express.json()
+const webhooks = require('./routes/webhooks');
+app.post('/api/webhooks/mux', express.raw({ type: 'application/json' }), webhooks.mux);
+app.post('/api/webhooks/razorpay', express.raw({ type: 'application/json' }), webhooks.razorpay);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -227,6 +233,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/utilities', utilityRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

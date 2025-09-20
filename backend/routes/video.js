@@ -36,11 +36,27 @@ router.post('/token', authMiddleware, async (req, res) => {
     }
     
     // Verify user has access to the batch
-    const enrollment = await db.collection('enrollments')
-      .where('userId', '==', userId)
+    let enrollment = await db.collection('enrollments')
+      .where('studentId', '==', userId)
       .where('batchId', '==', batchId)
-      .where('status', '==', 'active')
+      .where('paymentStatus', '==', 'completed')
       .get();
+    
+    // Fallback check for legacy enrollments with status field
+    if (enrollment.empty) {
+      const legacyEnrollment = await db.collection('enrollments')
+        .where('studentId', '==', userId)
+        .where('batchId', '==', batchId)
+        .where('status', '==', 'active')
+        .get();
+      
+      if (!legacyEnrollment.empty) {
+        // Update legacy enrollment to use paymentStatus
+        const legacyDoc = legacyEnrollment.docs[0];
+        await legacyDoc.ref.update({ paymentStatus: 'completed' });
+        enrollment = legacyEnrollment;
+      }
+    }
     
     if (enrollment.empty) {
       await logAuditEvent(AUDIT_EVENTS.UNAUTHORIZED_ACCESS, req, {

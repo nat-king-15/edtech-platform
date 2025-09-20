@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');
 const { firestore } = require('../config/firebase');
+const admin = require('firebase-admin');
 
 class UtilityService {
   constructor() {
@@ -273,7 +274,7 @@ class UtilityService {
       await fs.mkdir(this.dataDir, { recursive: true });
       
       const dataToSave = includeTimestamp ? {
-        timestamp: new Date().toISOString(),
+        timestamp: admin.firestore.Timestamp.fromDate(new Date()),
         data: data
       } : data;
       
@@ -352,10 +353,10 @@ class UtilityService {
   /**
    * Calculate time difference
    */
-  calculateTimeDifference(startDate, endDate = new Date()) {
+  calculateTimeDifference(startDate, endDate = null) {
     try {
+      const end = endDate ? new Date(endDate) : new Date();
       const start = new Date(startDate);
-      const end = new Date(endDate);
       const diffMs = end - start;
       
       const diffSeconds = Math.floor(diffMs / 1000);

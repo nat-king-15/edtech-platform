@@ -1,0 +1,402 @@
+const nodemailer = require('nodemailer');
+
+/**
+ * Email service utility for sending notifications
+ * Uses nodemailer with Gmail SMTP configuration
+ */
+class EmailService {
+  constructor() {
+    this.transporter = null;
+    this.initializeTransporter();
+  }
+
+  /**
+   * Initialize nodemailer transporter
+   */
+  initializeTransporter() {
+    try {
+      const user = process.env.EMAIL_USER;
+      const pass = process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS;
+
+      if (!user || !pass) {
+        console.warn('⚠️  SMTP credentials missing. Email notifications will fall back to dev-mode logging.');
+        this.transporter = null;
+        return;
+      }
+
+      this.transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+          user: user,
+          pass: pass
+        },
+        tls: {
+          rejectUnauthorized: false
+        }
+      });
+
+      console.log('📧 Email service initialized successfully');
+    } catch (error) {
+      console.error('❌ Failed to initialize email service:', error);
+    }
+  }
+
+  /**
+   * Send teacher assignment notification email
+   * @param {Object} emailData - Email data object
+   * @param {string} emailData.teacherEmail - Teacher's email address
+   * @param {string} emailData.teacherName - Teacher's name
+   * @param {string} emailData.subjectTitle - Subject title
+   * @param {string} emailData.batchTitle - Batch title
+   * @param {string} emailData.dashboardUrl - Dashboard URL
+   */
+  async sendTeacherAssignmentEmail(emailData) {
+    try {
+      const { teacherEmail, teacherName, subjectTitle, batchTitle, dashboardUrl } = emailData;
+
+      if (!this.transporter) {
+        throw new Error('Email transporter not initialized');
+      }
+
+      if (!teacherEmail || !teacherName || !subjectTitle || !batchTitle) {
+        throw new Error('Missing required email data');
+      }
+
+      const mailOptions = {
+        from: {
+          name: 'EdTech Platform',
+          address: process.env.EMAIL_USER
+        },
+        to: teacherEmail,
+        subject: `New Subject Assignment - ${subjectTitle}`,
+        html: this.generateTeacherAssignmentTemplate({
+          teacherName,
+          subjectTitle,
+          batchTitle,
+          dashboardUrl: dashboardUrl || process.env.FRONTEND_URL || 'http://localhost:3000'
+        })
+      };
+
+      const result = await this.transporter.sendMail(mailOptions);
+      
+      console.log(`📧 Teacher assignment email sent successfully to ${teacherEmail}`);
+      console.log('Message ID:', result.messageId);
+      
+      return {
+        success: true,
+        messageId: result.messageId,
+        recipient: teacherEmail
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send teacher assignment email:', error);
+      throw new Error(`Email sending failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate HTML template for teacher assignment email
+   * @param {Object} data - Template data
+   * @returns {string} HTML email template
+   */
+  generateTeacherAssignmentTemplate(data) {
+    const { teacherName, subjectTitle, batchTitle, dashboardUrl } = data;
+    
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Subject Assignment Notification</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+                background-color: #f4f4f4;
+            }
+            .email-container {
+                background-color: #ffffff;
+                border-radius: 10px;
+                padding: 30px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .header {
+                text-align: center;
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+                border-bottom: 2px solid #e9ecef;
+            }
+            .logo {
+                font-size: 28px;
+                font-weight: bold;
+                color: #007bff;
+                margin-bottom: 10px;
+            }
+            .title {
+                font-size: 24px;
+                color: #28a745;
+                margin-bottom: 20px;
+            }
+            .content {
+                margin-bottom: 30px;
+            }
+            .highlight {
+                background-color: #e7f3ff;
+                padding: 15px;
+                border-radius: 8px;
+                border-left: 4px solid #007bff;
+                margin: 20px 0;
+            }
+            .subject-info {
+                background-color: #f8f9fa;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }
+            .cta-button {
+                display: inline-block;
+                background-color: #007bff;
+                color: white;
+                padding: 12px 30px;
+                text-decoration: none;
+                border-radius: 5px;
+                font-weight: bold;
+                margin: 20px 0;
+                text-align: center;
+            }
+            .footer {
+                text-align: center;
+                margin-top: 30px;
+                padding-top: 20px;
+                border-top: 1px solid #e9ecef;
+                color: #6c757d;
+                font-size: 14px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="email-container">
+            <div class="header">
+                <div class="logo">📚 EdTech Platform</div>
+                <h1 class="title">New Subject Assignment</h1>
+            </div>
+            
+            <div class="content">
+                <p>Dear <strong>${teacherName}</strong>,</p>
+                
+                <div class="highlight">
+                    <p>You have been assigned to teach a new subject! We're excited to have you on board.</p>
+                </div>
+                
+                <div class="subject-info">
+                    <h3>📖 Assignment Details:</h3>
+                    <ul>
+                        <li><strong>Subject:</strong> ${subjectTitle}</li>
+                        <li><strong>Batch:</strong> ${batchTitle}</li>
+                        <li><strong>Role:</strong> Subject Teacher</li>
+                    </ul>
+                </div>
+                
+                <p>As the assigned teacher for this subject, you can now:</p>
+                <ul>
+                    <li>✅ Access your teacher dashboard</li>
+                    <li>✅ Manage course content and materials</li>
+                    <li>✅ View student enrollment and progress</li>
+                    <li>✅ Create assignments and assessments</li>
+                    <li>✅ Communicate with students and administrators</li>
+                </ul>
+                
+                <div style="text-align: center;">
+                    <a href="${dashboardUrl}" class="cta-button">Access Your Dashboard</a>
+                </div>
+                
+                <p>If you have any questions or need assistance getting started, please don't hesitate to contact our support team.</p>
+                
+                <p>Welcome to the team!</p>
+            </div>
+            
+            <div class="footer">
+                <p>Best regards,<br>
+                <strong>EdTech Platform Team</strong></p>
+                
+                <p><small>This is an automated notification. Please do not reply to this email.</small></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+  }
+
+  /**
+   * Send general email (for notification service)
+   * @param {Object} emailData - Email data
+   * @param {string} emailData.to - Recipient email
+   * @param {string} emailData.subject - Email subject
+   * @param {string} emailData.html - HTML content
+   * @param {string} emailData.text - Plain text content (optional)
+   * @param {string} emailData.from - Sender email (optional)
+   */
+  async sendEmail(emailData) {
+    try {
+      const { to, subject, html, text, from } = emailData;
+
+      // Validate required fields
+      if (!to || !subject || !html) {
+        throw new Error('Missing required email fields: to, subject, html');
+      }
+
+      // If no transporter is available, log to console (development mode)
+      if (!this.transporter) {
+        console.log('📧 Email would be sent (SMTP not configured):');
+        console.log('To:', to);
+        console.log('Subject:', subject);
+        console.log('HTML:', html.substring(0, 200) + '...');
+        return {
+          success: true,
+          messageId: 'dev-mode-' + Date.now(),
+          mode: 'development'
+        };
+      }
+
+      const mailOptions = {
+        from: from || {
+          name: 'EdTech Platform',
+          address: process.env.EMAIL_USER
+        },
+        to,
+        subject,
+        html,
+        text: text || this.htmlToText(html)
+      };
+
+      // Send email
+      const info = await this.transporter.sendMail(mailOptions);
+      
+      console.log('✅ Email sent successfully:', {
+        to,
+        subject,
+        messageId: info.messageId
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId,
+        mode: 'production'
+      };
+    } catch (error) {
+      console.error('❌ Failed to send email:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Send bulk emails
+   * @param {Array} emailList - Array of email data objects
+   */
+  async sendBulkEmails(emailList) {
+    const results = [];
+    const batchSize = 5; // Send in batches to avoid overwhelming SMTP server
+
+    for (let i = 0; i < emailList.length; i += batchSize) {
+      const batch = emailList.slice(i, i + batchSize);
+      const batchPromises = batch.map(emailData => 
+        this.sendEmail(emailData)
+          .then(result => ({ ...result, email: emailData.to }))
+          .catch(error => ({ 
+            success: false, 
+            error: error.message, 
+            email: emailData.to 
+          }))
+      );
+
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // Add delay between batches to avoid rate limiting
+      if (i + batchSize < emailList.length) {
+        await this.delay(1000); // 1 second delay
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Convert HTML to plain text (basic implementation)
+   * @param {string} html - HTML content
+   */
+  htmlToText(html) {
+    return html
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
+      .replace(/&amp;/g, '&') // Replace &amp; with &
+      .replace(/&lt;/g, '<') // Replace &lt; with <
+      .replace(/&gt;/g, '>') // Replace &gt; with >
+      .replace(/&quot;/g, '"') // Replace &quot; with "
+      .replace(/&#39;/g, "'") // Replace &#39; with '
+      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .trim();
+  }
+
+  /**
+   * Delay function for batch processing
+   * @param {number} ms - Milliseconds to delay
+   */
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Test email configuration
+   * @returns {Promise<boolean>} True if configuration is valid
+   */
+  async testConnection() {
+    try {
+      if (!this.transporter) {
+        console.log('⚠️  No SMTP configuration found. Email notifications will be logged to console.');
+        return {
+          success: false,
+          message: 'No SMTP configuration found'
+        };
+      }
+
+      await this.transporter.verify();
+      console.log('✅ Email service connection test successful');
+      return {
+        success: true,
+        message: 'Email service connection successful'
+      };
+    } catch (error) {
+      console.error('❌ Email service connection test failed:', error);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
+  /**
+   * Get email service status
+   */
+  getStatus() {
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS;
+    
+    return {
+      configured: !!this.transporter,
+      host: 'gmail',
+      user: user || 'Not configured',
+      hasPassword: !!pass
+    };
+  }
+}
+
+// Create singleton instance
+const emailService = new EmailService();
+
+module.exports = emailService;

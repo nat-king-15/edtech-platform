@@ -1,0 +1,27 @@
+{
+  "name": "edtech-platform-tests",
+  "version": "1.0.0",
+  "description": "Test automation for EdTech platform",
+  "main": "test-execution.js",
+  "scripts": {
+    "test": "node test-execution.js",
+    "test:health": "node test-execution.js health",
+    "test:auth": "node test-execution.js auth",
+    "test:api": "node test-execution.js api",
+    "test:frontend": "node test-execution.js frontend",
+    "test:full": "node test-execution.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "testing",
+    "edtech",
+    "automation",
+    "api-testing"
+  ],
+  "author": "EdTech Platform Team",
+  "license": "MIT"
+}

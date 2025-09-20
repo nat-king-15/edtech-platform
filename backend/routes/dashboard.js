@@ -216,12 +216,12 @@ router.get('/streak',
       const { firestore } = require('../config/firebase');
       
       // Get user activities for streak calculation
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgo = admin.firestore.Timestamp.fromDate(new Date());
+      thirtyDaysAgo.toDate().setDate(thirtyDaysAgo.toDate().getDate() - 30);
       
       const activitiesSnapshot = await firestore.collection('user_activities')
         .where('userId', '==', userId)
-        .where('timestamp', '>=', thirtyDaysAgo)
+        .where('timestamp', '>=', thirtyDaysAgo.toDate())
         .orderBy('timestamp', 'desc')
         .get();
       
@@ -235,7 +235,7 @@ router.get('/streak',
       // Group activities by date
       const activityDates = new Set();
       activities.forEach(activity => {
-        const dateStr = activity.timestamp.toISOString().split('T')[0];
+        const dateStr = activity.timestamp.toDate().toISOString().split('T')[0];
         activityDates.add(dateStr);
       });
       
@@ -391,27 +391,27 @@ router.get('/analytics/performance',
       const { firestore } = require('../config/firebase');
       
       // Calculate date range based on period
-      const endDate = new Date();
-      const startDate = new Date();
+      const endDate = admin.firestore.Timestamp.fromDate(new Date());
+      const startDate = admin.firestore.Timestamp.fromDate(new Date());
       
       switch (period) {
         case 'week':
-          startDate.setDate(startDate.getDate() - 7);
+          startDate.toDate().setDate(startDate.toDate().getDate() - 7);
           break;
         case 'month':
-          startDate.setMonth(startDate.getMonth() - 1);
+          startDate.toDate().setMonth(startDate.toDate().getMonth() - 1);
           break;
         case 'quarter':
-          startDate.setMonth(startDate.getMonth() - 3);
+          startDate.toDate().setMonth(startDate.toDate().getMonth() - 3);
           break;
         case 'year':
-          startDate.setFullYear(startDate.getFullYear() - 1);
+          startDate.toDate().setFullYear(startDate.toDate().getFullYear() - 1);
           break;
       }
       
       let query = firestore.collection('user_activities')
-        .where('timestamp', '>=', startDate)
-        .where('timestamp', '<=', endDate);
+        .where('timestamp', '>=', startDate.toDate())
+        .where('timestamp', '<=', endDate.toDate());
       
       if (batchId) {
         query = query.where('batchId', '==', batchId);
@@ -438,7 +438,7 @@ router.get('/analytics/performance',
         analytics.activityTypes[activity.type] = (analytics.activityTypes[activity.type] || 0) + 1;
         
         // Group by date
-        const dateStr = activity.timestamp.toISOString().split('T')[0];
+        const dateStr = activity.timestamp.toDate().toISOString().split('T')[0];
         analytics.dailyActivity[dateStr] = (analytics.dailyActivity[dateStr] || 0) + 1;
       });
       
@@ -455,8 +455,8 @@ router.get('/analytics/performance',
         analytics,
         period,
         dateRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString()
+          start: admin.firestore.Timestamp.fromDate(startDate),
+          end: admin.firestore.Timestamp.fromDate(endDate)
         }
       });
     } catch (error) {

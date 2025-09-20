@@ -1,4 +1,5 @@
 const { firestore } = require('../config/firebase');
+const admin = require('firebase-admin');
 const dashboardService = require('./dashboardService');
 const fs = require('fs').promises;
 const path = require('path');
@@ -27,8 +28,8 @@ class TrackingService {
         watchTime: videoData.watchTime || 0,
         completed: videoData.completed || false,
         completionPercentage: videoData.completionPercentage || 0,
-        lastWatched: new Date(),
-        updatedAt: new Date()
+        lastWatched: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
 
       // Update or create progress record
@@ -58,7 +59,7 @@ class TrackingService {
         title: videoData.title,
         watchTime: videoData.watchTime,
         completed: videoData.completed,
-        timestamp: new Date().toISOString()
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       return {
@@ -92,8 +93,8 @@ class TrackingService {
         accessCount: (notesData.accessCount || 0) + 1,
         timeSpent: notesData.timeSpent || 0,
         completed: notesData.completed || false,
-        lastAccessed: new Date(),
-        updatedAt: new Date()
+        lastAccessed: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
 
       // Update or create progress record
@@ -131,7 +132,7 @@ class TrackingService {
         accessCount: progressData.accessCount,
         timeSpent: progressData.timeSpent,
         completed: notesData.completed,
-        timestamp: new Date().toISOString()
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       return {
@@ -168,9 +169,9 @@ class TrackingService {
         timeSpent: quizData.timeSpent || 0,
         completed: quizData.completed || false,
         answers: quizData.answers || [],
-        startedAt: quizData.startedAt || new Date(),
-        completedAt: quizData.completed ? new Date() : null,
-        createdAt: new Date()
+        startedAt: quizData.startedAt || admin.firestore.Timestamp.fromDate(new Date()),
+        completedAt: quizData.completed ? admin.firestore.Timestamp.fromDate(new Date()) : null,
+        createdAt: admin.firestore.Timestamp.fromDate(new Date())
       };
 
       // Save quiz attempt
@@ -188,8 +189,8 @@ class TrackingService {
         bestPercentage: quizData.percentage,
         totalAttempts: quizData.attemptNumber,
         completed: quizData.completed,
-        lastAttempted: new Date(),
-        updatedAt: new Date()
+        lastAttempted: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
 
       const progressId = `${userId}_${quizData.quizId}`;
@@ -230,7 +231,7 @@ class TrackingService {
         percentage: quizData.percentage,
         attemptNumber: progressData.totalAttempts,
         completed: quizData.completed,
-        timestamp: new Date().toISOString()
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       return {
@@ -261,7 +262,7 @@ class TrackingService {
         subjectId: assignmentData.subjectId,
         submissionFile: assignmentData.submissionFile,
         submissionText: assignmentData.submissionText,
-        submittedAt: new Date(),
+        submittedAt: admin.firestore.Timestamp.fromDate(new Date()),
         status: 'submitted',
         score: assignmentData.score || null,
         feedback: assignmentData.feedback || null,
@@ -280,10 +281,10 @@ class TrackingService {
         batchId: assignmentData.batchId,
         subjectId: assignmentData.subjectId,
         submitted: true,
-        submittedAt: new Date(),
+        submittedAt: admin.firestore.Timestamp.fromDate(new Date()),
         score: assignmentData.score,
         completed: !!assignmentData.score,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
 
       const progressId = `${userId}_${assignmentData.assignmentId}`;
@@ -497,7 +498,7 @@ class TrackingService {
 
       const exportData = {
         userId: userId,
-        exportedAt: new Date().toISOString(),
+        exportedAt: admin.firestore.Timestamp.fromDate(new Date()),
         data: {
           videos: videoData,
           notes: notesData,
@@ -524,8 +525,8 @@ class TrackingService {
    */
   async cleanupOldTrackingData(daysOld = 90) {
     try {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+      const cutoffDate = admin.firestore.Timestamp.fromDate(new Date());
+      cutoffDate.toDate().setDate(cutoffDate.toDate().getDate() - daysOld);
 
       // Clean up old activities
       const oldActivitiesSnapshot = await this.db.collection('user_activities')

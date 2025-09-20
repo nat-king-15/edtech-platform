@@ -92,7 +92,7 @@ router.post('/verify-otp',
         userData = {
           phoneNumber,
           role: 'student',
-          createdAt: new Date(),
+          createdAt: admin.firestore.Timestamp.fromDate(new Date()),
           isActive: true,
           profile: {
             isComplete: false
@@ -286,8 +286,8 @@ router.post('/logout',
         await firestore.collection('token_blacklist').add({
           token,
           userId,
-          blacklistedAt: new Date(),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+          blacklistedAt: admin.firestore.Timestamp.fromDate(new Date()),
+          expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)) // 24 hours
         });
       }
       
@@ -295,7 +295,7 @@ router.post('/logout',
       await firestore.collection('user_activities').add({
         userId,
         type: 'logout',
-        timestamp: new Date(),
+        timestamp: admin.firestore.Timestamp.fromDate(new Date()),
         metadata: {
           userAgent: req.headers['user-agent'] || '',
           ip: req.ip || req.connection.remoteAddress

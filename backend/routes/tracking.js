@@ -199,7 +199,7 @@ router.post('/assignment',
         subjectId: req.body.subjectId,
         submissionId: req.body.submissionId,
         status: req.body.status,
-        submissionTime: new Date(req.body.submissionTime),
+        submissionTime: admin.firestore.Timestamp.fromDate(new Date(req.body.submissionTime)),
         attachments: req.body.attachments || [],
         score: req.body.score || null,
         feedback: req.body.feedback || null
@@ -517,18 +517,18 @@ router.get('/analytics/batch/:batchId',
       const { firestore } = require('../config/firebase');
       
       // Calculate date range
-      const endDate = new Date();
-      const startDate = new Date();
+      const endDate = admin.firestore.Timestamp.fromDate(new Date());
+      const startDate = admin.firestore.Timestamp.fromDate(new Date());
       
       switch (period) {
         case 'week':
-          startDate.setDate(startDate.getDate() - 7);
+          startDate.toDate().setDate(startDate.toDate().getDate() - 7);
           break;
         case 'month':
-          startDate.setMonth(startDate.getMonth() - 1);
+          startDate.toDate().setMonth(startDate.toDate().getMonth() - 1);
           break;
         case 'quarter':
-          startDate.setMonth(startDate.getMonth() - 3);
+          startDate.toDate().setMonth(startDate.toDate().getMonth() - 3);
           break;
       }
       
@@ -560,8 +560,8 @@ router.get('/analytics/batch/:batchId',
       for (const collection of collections) {
         const snapshot = await firestore.collection(collection)
           .where('batchId', '==', batchId)
-          .where('timestamp', '>=', startDate)
-          .where('timestamp', '<=', endDate)
+          .where('timestamp', '>=', startDate.toDate())
+          .where('timestamp', '<=', endDate.toDate())
           .get();
         
         trackingData[collection] = snapshot.docs.map(doc => doc.data());
@@ -599,8 +599,8 @@ router.get('/analytics/batch/:batchId',
         totalActivities,
         period,
         dateRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString()
+          start: admin.firestore.Timestamp.fromDate(startDate),
+          end: admin.firestore.Timestamp.fromDate(endDate)
         }
       };
       

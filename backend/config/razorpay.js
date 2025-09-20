@@ -1,18 +1,107 @@
 const Razorpay = require('razorpay');
-require('dotenv').config();
 
-// Initialize Razorpay instance with credentials from environment variables
-const instance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+let razorpayInstance = null;
+let isInitialized = false;
+let initializationError = null;
 
-// Validate that required environment variables are present
-if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    console.error('❌ Razorpay configuration error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set in environment variables');
-    process.exit(1);
+/**
+ * Lazy initialization of Razorpay instance
+ * @returns {Razorpay} Razorpay instance
+ * @throws {Error} When credentials are missing or invalid
+ */
+function getRazorpayInstance() {
+  if (isInitialized) {
+    if (initializationError) {
+      throw initializationError;
+    }
+    return razorpayInstance;
+  }
+
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!keyId || !keySecret) {
+      const error = new Error('Razorpay credentials not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET environment variables.');
+      error.code = 'RAZORPAY_CREDENTIALS_MISSING';
+      initializationError = error;
+      isInitialized = true;
+      throw error;
+    }
+
+    razorpayInstance = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+
+    console.log('✅ Razorpay initialized successfully');
+    isInitialized = true;
+    return razorpayInstance;
+
+  } catch (error) {
+    console.error('❌ Failed to initialize Razorpay:', error.message);
+    initializationError = error;
+    isInitialized = true;
+    throw error;
+  }
 }
 
-console.log('✅ Razorpay instance initialized successfully');
+/**
+ * Check if Razorpay is available (credentials are configured)
+ * @returns {boolean} True if Razorpay is available, false otherwise
+ */
+function isRazorpayAvailable() {
+  try {
+    getRazorpayInstance();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
 
-module.exports = instance;
+/**
+ * Get Razorpay availability status and error details
+ * @returns {Object} Status object with availability and error info
+ */
+function getRazorpayStatus() {
+  try {
+    getRazorpayInstance();
+    return {
+      available: true,
+      error: null
+    };
+  } catch (error) {
+    return {
+      available: false,
+      error: {
+        message: error.message,
+        code: error.code || 'RAZORPAY_ERROR'
+      }
+    };
+  }
+}
+
+// Create a proxy object that lazily initializes Razorpay
+const razorpayProxy = new Proxy({
+  isRazorpayAvailable,
+  getRazorpayStatus
+}, {
+  get(target, prop) {
+    // If it's one of our utility functions, return it directly
+    if (prop === 'isRazorpayAvailable' || prop === 'getRazorpayStatus') {
+      return target[prop];
+    }
+    
+    // For Razorpay methods, get the instance first
+    const instance = getRazorpayInstance();
+    const value = instance[prop];
+    
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    
+    return value;
+  }
+});
+
+module.exports = razorpayProxy;

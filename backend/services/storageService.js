@@ -1,5 +1,6 @@
 const { storage } = require('../config/firebase');
 const { v4: uuidv4 } = require('uuid');
+const admin = require('firebase-admin');
 
 class StorageService {
   constructor() {
@@ -18,7 +19,7 @@ class StorageService {
       // Generate unique file path
       const fileExtension = fileName.split('.').pop();
       const uniqueFileName = `${uuidv4()}.${fileExtension}`;
-      const filePath = `content/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${uniqueFileName}`;
+      const filePath = `content/${admin.firestore.Timestamp.fromDate(new Date()).toDate().getFullYear()}/${admin.firestore.Timestamp.fromDate(new Date()).toDate().getMonth() + 1}/${uniqueFileName}`;
       
       const file = this.bucket.file(filePath);
       

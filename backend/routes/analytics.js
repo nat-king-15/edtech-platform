@@ -402,7 +402,7 @@ router.get('/realtime',
             activeUsers: 0,
             onlineStudents: 0,
             currentSessions: 0,
-            lastUpdated: new Date()
+            lastUpdated: admin.firestore.Timestamp.fromDate(new Date())
           },
           message: 'Real-time analytics retrieved successfully'
         });
@@ -560,7 +560,7 @@ router.get('/export',
         res.json({
           success: true,
           data: analytics,
-          exportedAt: new Date(),
+          exportedAt: admin.firestore.Timestamp.fromDate(new Date()),
           type,
           timeRange
         });

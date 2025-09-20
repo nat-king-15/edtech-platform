@@ -1,17 +1,24 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { firestore } = require('../config/firebase');
+const admin = require('firebase-admin');
 const notificationService = require('./notificationService');
 
 class TokenService {
   constructor() {
-    this.JWT_SECRET = process.env.JWT_SECRET;
     this.OTP_EXPIRY_MINUTES = 10;
     this.TOKEN_EXPIRY_DAYS = 7;
-    
-    if (!this.JWT_SECRET) {
+  }
+
+  /**
+   * Private method to get JWT secret
+   */
+  _getJWTSecret() {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
       throw new Error('JWT_SECRET environment variable is required');
     }
+    return secret;
   }
 
   /**
@@ -32,7 +39,7 @@ class TokenService {
         expiresAt: expiresAt,
         verified: false,
         attempts: 0,
-        createdAt: new Date()
+        createdAt: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       // Send OTP via notification service (SMS/Email)
@@ -45,7 +52,7 @@ class TokenService {
         expiresIn: this.OTP_EXPIRY_MINUTES * 60 * 1000
       };
     } catch (error) {
-      console.error('Error generating OTP:', error);
+      console.error('Error generating OTP');
       return {
         success: false,
         error_message: error.message,
@@ -73,7 +80,7 @@ class TokenService {
       const otpData = otpDoc.data();
       
       // Check if OTP is expired
-      if (new Date() > otpData.expiresAt.toDate()) {
+      if (admin.firestore.Timestamp.fromDate(new Date()) > otpData.expiresAt.toDate()) {
         return {
           success: false,
           error_message: 'OTP has expired',
@@ -116,7 +123,7 @@ class TokenService {
       // Mark OTP as verified
       await firestore.collection('otps').doc(randomId).update({
         verified: true,
-        verifiedAt: new Date()
+        verifiedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       // Generate access token
@@ -137,7 +144,7 @@ class TokenService {
         token_type: 'Bearer'
       };
     } catch (error) {
-      console.error('Error verifying OTP:', error);
+      console.error('Error verifying OTP');
       return {
         success: false,
         error_message: error.message,
@@ -152,7 +159,7 @@ class TokenService {
   generateAccessToken(payload) {
     return jwt.sign(
       payload,
-      this.JWT_SECRET,
+      this._getJWTSecret(),
       { expiresIn: `${this.TOKEN_EXPIRY_DAYS}d` }
     );
   }
@@ -163,7 +170,7 @@ class TokenService {
    */
   async verifyToken(token) {
     try {
-      const decoded = jwt.verify(token, this.JWT_SECRET);
+      const decoded = jwt.verify(token, this._getJWTSecret());
       
       return {
         success: true,
@@ -266,7 +273,7 @@ class TokenService {
   async cleanupExpiredOTPs() {
     try {
       const expiredOTPs = await firestore.collection('otps')
-        .where('expiresAt', '<', new Date())
+        .where('expiresAt', '<', admin.firestore.Timestamp.fromDate(new Date()))
         .get();
 
       const batch = firestore.batch();
@@ -277,7 +284,7 @@ class TokenService {
       await batch.commit();
       console.log(`Cleaned up ${expiredOTPs.size} expired OTPs`);
     } catch (error) {
-      console.error('Error cleaning up expired OTPs:', error);
+      console.error('Error cleaning up expired OTPs');
     }
   }
 }

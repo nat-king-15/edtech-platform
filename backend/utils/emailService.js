@@ -1,390 +1,672 @@
-const nodemailer = require('nodemailer');
-
 /**
- * Email service utility for sending notifications
- * Uses nodemailer with Gmail SMTP configuration
+ * Enhanced Email Service with Template Engine, Structured Logging, Retry Logic, and Metrics
+ * Refactored to use centralized templates, exponential backoff, and comprehensive monitoring
  */
+const nodemailer = require('nodemailer');
+const templateEngine = require('./templateEngine');
+const { EmailLogger } = require('./logger');
+const { RetryHandlers } = require('./retryHandler');
+const { emailMetrics } = require('./emailMetrics');
+
 class EmailService {
   constructor() {
     this.transporter = null;
-    this.initializeTransporter();
+    this.templateEngine = templateEngine;
+    this.logger = new EmailLogger('email-service');
+    this.retryHandler = RetryHandlers.email;
+    this.metrics = emailMetrics;
+    this.isInitialized = false;
+    this.config = {
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      pool: true,
+      maxConnections: parseInt(process.env.SMTP_MAX_CONNECTIONS) || 5,
+      maxMessages: parseInt(process.env.SMTP_MAX_MESSAGES) || 100,
+      rateDelta: parseInt(process.env.SMTP_RATE_DELTA) || 1000,
+      rateLimit: parseInt(process.env.SMTP_RATE_LIMIT) || 5
+    };
+
+    this.initialize();
   }
 
   /**
-   * Initialize nodemailer transporter
+   * Initialize the email service
    */
-  initializeTransporter() {
+  async initialize() {
     try {
-      this.transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD // Use App Password for Gmail
-        },
-        tls: {
-          rejectUnauthorized: false
-        }
+      this.logger.logConfig('initialization_start', this.config);
+      
+      // Initialize template engine
+      await this.templateEngine.preloadTemplates();
+      this.logger.logConfig('templates_loaded', { 
+        templates: this.templateEngine.getAvailableTemplates() 
       });
 
-      console.log('📧 Email service initialized successfully');
-    } catch (error) {
-      console.error('❌ Failed to initialize email service:', error);
-    }
-  }
-
-  /**
-   * Send teacher assignment notification email
-   * @param {Object} emailData - Email data object
-   * @param {string} emailData.teacherEmail - Teacher's email address
-   * @param {string} emailData.teacherName - Teacher's name
-   * @param {string} emailData.subjectTitle - Subject title
-   * @param {string} emailData.batchTitle - Batch title
-   * @param {string} emailData.dashboardUrl - Dashboard URL
-   */
-  async sendTeacherAssignmentEmail(emailData) {
-    try {
-      const { teacherEmail, teacherName, subjectTitle, batchTitle, dashboardUrl } = emailData;
-
-      if (!this.transporter) {
-        throw new Error('Email transporter not initialized');
-      }
-
-      if (!teacherEmail || !teacherName || !subjectTitle || !batchTitle) {
-        throw new Error('Missing required email data');
-      }
-
-      const mailOptions = {
-        from: {
-          name: 'EdTech Platform',
-          address: process.env.EMAIL_USER
-        },
-        to: teacherEmail,
-        subject: `New Subject Assignment - ${subjectTitle}`,
-        html: this.generateTeacherAssignmentTemplate({
-          teacherName,
-          subjectTitle,
-          batchTitle,
-          dashboardUrl: dashboardUrl || process.env.FRONTEND_URL || 'http://localhost:3000'
-        })
-      };
-
-      const result = await this.transporter.sendMail(mailOptions);
+      // Initialize SMTP transporter
+      await this.initializeTransporter();
       
-      console.log(`📧 Teacher assignment email sent successfully to ${teacherEmail}`);
-      console.log('Message ID:', result.messageId);
+      // Test connection
+      await this.testConnection();
       
-      return {
-        success: true,
-        messageId: result.messageId,
-        recipient: teacherEmail
-      };
-
-    } catch (error) {
-      console.error('❌ Failed to send teacher assignment email:', error);
-      throw new Error(`Email sending failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Generate HTML template for teacher assignment email
-   * @param {Object} data - Template data
-   * @returns {string} HTML email template
-   */
-  generateTeacherAssignmentTemplate(data) {
-    const { teacherName, subjectTitle, batchTitle, dashboardUrl } = data;
-    
-    return `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Subject Assignment Notification</title>
-        <style>
-            body {
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                line-height: 1.6;
-                color: #333;
-                max-width: 600px;
-                margin: 0 auto;
-                padding: 20px;
-                background-color: #f4f4f4;
-            }
-            .email-container {
-                background-color: #ffffff;
-                border-radius: 10px;
-                padding: 30px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-            .header {
-                text-align: center;
-                margin-bottom: 30px;
-                padding-bottom: 20px;
-                border-bottom: 2px solid #e9ecef;
-            }
-            .logo {
-                font-size: 28px;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 10px;
-            }
-            .title {
-                font-size: 24px;
-                color: #28a745;
-                margin-bottom: 20px;
-            }
-            .content {
-                margin-bottom: 30px;
-            }
-            .highlight {
-                background-color: #e7f3ff;
-                padding: 15px;
-                border-radius: 8px;
-                border-left: 4px solid #007bff;
-                margin: 20px 0;
-            }
-            .subject-info {
-                background-color: #f8f9fa;
-                padding: 20px;
-                border-radius: 8px;
-                margin: 20px 0;
-            }
-            .cta-button {
-                display: inline-block;
-                background-color: #007bff;
-                color: white;
-                padding: 12px 30px;
-                text-decoration: none;
-                border-radius: 5px;
-                font-weight: bold;
-                margin: 20px 0;
-                text-align: center;
-            }
-            .footer {
-                text-align: center;
-                margin-top: 30px;
-                padding-top: 20px;
-                border-top: 1px solid #e9ecef;
-                color: #6c757d;
-                font-size: 14px;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="email-container">
-            <div class="header">
-                <div class="logo">📚 EdTech Platform</div>
-                <h1 class="title">New Subject Assignment</h1>
-            </div>
-            
-            <div class="content">
-                <p>Dear <strong>${teacherName}</strong>,</p>
-                
-                <div class="highlight">
-                    <p>You have been assigned to teach a new subject! We're excited to have you on board.</p>
-                </div>
-                
-                <div class="subject-info">
-                    <h3>📖 Assignment Details:</h3>
-                    <ul>
-                        <li><strong>Subject:</strong> ${subjectTitle}</li>
-                        <li><strong>Batch:</strong> ${batchTitle}</li>
-                        <li><strong>Role:</strong> Subject Teacher</li>
-                    </ul>
-                </div>
-                
-                <p>As the assigned teacher for this subject, you can now:</p>
-                <ul>
-                    <li>✅ Access your teacher dashboard</li>
-                    <li>✅ Manage course content and materials</li>
-                    <li>✅ View student enrollment and progress</li>
-                    <li>✅ Create assignments and assessments</li>
-                    <li>✅ Communicate with students and administrators</li>
-                </ul>
-                
-                <div style="text-align: center;">
-                    <a href="${dashboardUrl}" class="cta-button">Access Your Dashboard</a>
-                </div>
-                
-                <p>If you have any questions or need assistance getting started, please don't hesitate to contact our support team.</p>
-                
-                <p>Welcome to the team!</p>
-            </div>
-            
-            <div class="footer">
-                <p>Best regards,<br>
-                <strong>EdTech Platform Team</strong></p>
-                
-                <p><small>This is an automated notification. Please do not reply to this email.</small></p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
-  }
-
-  /**
-   * Send general email (for notification service)
-   * @param {Object} emailData - Email data
-   * @param {string} emailData.to - Recipient email
-   * @param {string} emailData.subject - Email subject
-   * @param {string} emailData.html - HTML content
-   * @param {string} emailData.text - Plain text content (optional)
-   * @param {string} emailData.from - Sender email (optional)
-   */
-  async sendEmail(emailData) {
-    try {
-      const { to, subject, html, text, from } = emailData;
-
-      // Validate required fields
-      if (!to || !subject || !html) {
-        throw new Error('Missing required email fields: to, subject, html');
-      }
-
-      // If no transporter is available, log to console (development mode)
-      if (!this.transporter) {
-        console.log('📧 Email would be sent (SMTP not configured):');
-        console.log('To:', to);
-        console.log('Subject:', subject);
-        console.log('HTML:', html.substring(0, 200) + '...');
-        return {
-          success: true,
-          messageId: 'dev-mode-' + Date.now(),
-          mode: 'development'
-        };
-      }
-
-      const mailOptions = {
-        from: from || {
-          name: 'EdTech Platform',
-          address: process.env.EMAIL_USER
-        },
-        to,
-        subject,
-        html,
-        text: text || this.htmlToText(html)
-      };
-
-      // Send email
-      const info = await this.transporter.sendMail(mailOptions);
+      this.isInitialized = true;
+      this.logger.logConfig('initialization_complete', { status: 'ready' });
       
-      console.log('✅ Email sent successfully:', {
-        to,
-        subject,
-        messageId: info.messageId
-      });
-
-      return {
-        success: true,
-        messageId: info.messageId,
-        mode: 'production'
-      };
     } catch (error) {
-      console.error('❌ Failed to send email:', error.message);
+      this.logger.logEmailError('initialization', error);
+      this.metrics.recordEmailError(error, 'initialization');
       throw error;
     }
   }
 
   /**
-   * Send bulk emails
-   * @param {Array} emailList - Array of email data objects
+   * Initialize SMTP transporter with retry logic
    */
-  async sendBulkEmails(emailList) {
-    const results = [];
-    const batchSize = 5; // Send in batches to avoid overwhelming SMTP server
+  async initializeTransporter() {
+    const initTransporter = async () => {
+      this.transporter = nodemailer.createTransport(this.config);
+      
+      // Set up event listeners
+      this.transporter.on('idle', () => {
+        this.logger.logConnection('idle');
+        this.metrics.recordSmtpConnection('idle');
+      });
 
-    for (let i = 0; i < emailList.length; i += batchSize) {
-      const batch = emailList.slice(i, i + batchSize);
-      const batchPromises = batch.map(emailData => 
-        this.sendEmail(emailData)
-          .then(result => ({ ...result, email: emailData.to }))
-          .catch(error => ({ 
-            success: false, 
-            error: error.message, 
-            email: emailData.to 
-          }))
-      );
+      this.transporter.on('error', (error) => {
+        this.logger.logEmailError('smtp_connection', error);
+        this.metrics.recordSmtpConnection('error');
+      });
 
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
+      return this.transporter;
+    };
 
-      // Add delay between batches to avoid rate limiting
-      if (i + batchSize < emailList.length) {
-        await this.delay(1000); // 1 second delay
+    return await this.retryHandler.execute(
+      initTransporter,
+      this,
+      [],
+      {
+        onRetry: (info) => {
+          this.logger.logRetryAttempt('transporter_init', info.attempt, info.error);
+          this.metrics.recordEmailRetry(info.attempt, 'transporter_init');
+        },
+        onError: (info) => {
+          this.logger.logEmailError('transporter_init_final', info.error);
+        }
       }
-    }
-
-    return results;
+    );
   }
 
   /**
-   * Convert HTML to plain text (basic implementation)
-   * @param {string} html - HTML content
+   * Test SMTP connection
+   */
+  async testConnection() {
+    if (!this.transporter) {
+      throw new Error('Transporter not initialized');
+    }
+
+    const testConnectionFn = async () => {
+      const result = await this.transporter.verify();
+      this.logger.logConnection('test_success', { verified: result });
+      this.metrics.recordSmtpConnection('success');
+      return result;
+    };
+
+    return await this.retryHandler.execute(
+      testConnectionFn,
+      this,
+      [],
+      {
+        onRetry: (info) => {
+          this.logger.logRetryAttempt('connection_test', info.attempt, info.error);
+          this.metrics.recordEmailRetry(info.attempt, 'connection_test');
+        }
+      }
+    );
+  }
+
+  /**
+   * Send teacher assignment email using template
+   */
+  async sendTeacherAssignmentEmail(teacherEmail, assignmentData) {
+    const startTime = Date.now();
+    const operation = 'send_teacher_assignment';
+    const template = 'teacher-assignment';
+
+    try {
+      this.logger.logEmailAttempt(operation, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(teacherEmail) : teacherEmail,
+        template,
+        assignmentId: assignmentData.assignmentId
+      });
+
+      // Render email template
+      const templateData = {
+        platformName: process.env.PLATFORM_NAME || 'EdTech Platform',
+        teacherName: assignmentData.teacherName,
+        assignmentTitle: assignmentData.title,
+        courseName: assignmentData.courseName,
+        batchName: assignmentData.batchName,
+        dueDate: assignmentData.dueDate,
+        priority: assignmentData.priority || 'medium',
+        estimatedHours: assignmentData.estimatedHours,
+        description: assignmentData.description,
+        requirements: assignmentData.requirements || [],
+        baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+        assignmentId: assignmentData.assignmentId,
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@edtech.com',
+        currentYear: new Date().getFullYear()
+      };
+
+      const { html, text } = await this.renderTemplate(template, templateData);
+
+      // Prepare email options
+      const mailOptions = {
+        from: `"${process.env.FROM_NAME || 'EdTech Platform'}" <${process.env.FROM_EMAIL || this.config.auth.user}>`,
+        to: teacherEmail,
+        subject: `New Assignment: ${assignmentData.title}`,
+        html,
+        text,
+        headers: {
+          'X-Priority': assignmentData.priority === 'high' ? '1' : '3',
+          'X-Assignment-ID': assignmentData.assignmentId
+        }
+      };
+
+      // Send email with retry logic
+      const result = await this.sendEmailWithRetry(mailOptions, operation, template);
+      
+      const duration = Date.now() - startTime;
+      this.logger.logEmailSuccess(operation, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(teacherEmail) : teacherEmail,
+        template,
+        duration,
+        messageId: result.messageId
+      });
+      
+      this.metrics.recordEmailSuccess('teacher_assignment', template, 'smtp', duration);
+      
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.logEmailError(operation, error, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(teacherEmail) : teacherEmail,
+        template,
+        duration
+      });
+      
+      this.metrics.recordEmailFailure('teacher_assignment', template, 'smtp', duration, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send general notification email
+   */
+  async sendNotificationEmail(recipientEmail, notificationData) {
+    const startTime = Date.now();
+    const operation = 'send_notification';
+    const template = 'general-notification';
+
+    try {
+      this.logger.logEmailAttempt(operation, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(recipientEmail) : recipientEmail,
+        template,
+        type: notificationData.type
+      });
+
+      const templateData = {
+        platformName: process.env.PLATFORM_NAME || 'EdTech Platform',
+        subject: notificationData.subject,
+        type: notificationData.type,
+        recipientName: notificationData.recipientName,
+        message: notificationData.message,
+        details: notificationData.details || [],
+        content: notificationData.content,
+        actionUrl: notificationData.actionUrl,
+        additionalInfo: notificationData.additionalInfo,
+        unsubscribeUrl: notificationData.unsubscribeUrl,
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@edtech.com',
+        currentYear: new Date().getFullYear()
+      };
+
+      const { html, text } = await this.renderTemplate(template, templateData);
+
+      const mailOptions = {
+        from: `"${process.env.FROM_NAME || 'EdTech Platform'}" <${process.env.FROM_EMAIL || this.config.auth.user}>`,
+        to: recipientEmail,
+        subject: notificationData.subject,
+        html,
+        text,
+        headers: {
+          'X-Notification-Type': notificationData.type
+        }
+      };
+
+      const result = await this.sendEmailWithRetry(mailOptions, operation, template);
+      
+      const duration = Date.now() - startTime;
+      this.logger.logEmailSuccess(operation, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(recipientEmail) : recipientEmail,
+        template,
+        duration,
+        messageId: result.messageId
+      });
+      
+      this.metrics.recordEmailSuccess('notification', template, 'smtp', duration);
+      
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.logEmailError(operation, error, {
+        recipient: this.logger.constructor.sanitizeEmail ? 
+          this.logger.constructor.sanitizeEmail(recipientEmail) : recipientEmail,
+        template,
+        duration
+      });
+      
+      this.metrics.recordEmailFailure('notification', template, 'smtp', duration, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send welcome email
+   */
+  async sendWelcomeEmail(userEmail, userData) {
+    const startTime = Date.now();
+    const operation = 'send_welcome';
+    const template = 'welcome';
+
+    try {
+      const templateData = {
+        platformName: process.env.PLATFORM_NAME || 'EdTech Platform',
+        userName: userData.name,
+        userEmail: userEmail,
+        userRole: userData.role,
+        welcomeMessage: userData.welcomeMessage,
+        onboardingSteps: userData.onboardingSteps || [],
+        features: userData.features || [],
+        baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@edtech.com',
+        currentYear: new Date().getFullYear()
+      };
+
+      const { html, text } = await this.renderTemplate(template, templateData);
+
+      const mailOptions = {
+        from: `"${process.env.FROM_NAME || 'EdTech Platform'}" <${process.env.FROM_EMAIL || this.config.auth.user}>`,
+        to: userEmail,
+        subject: `Welcome to ${process.env.PLATFORM_NAME || 'EdTech Platform'}!`,
+        html,
+        text
+      };
+
+      const result = await this.sendEmailWithRetry(mailOptions, operation, template);
+      
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailSuccess('welcome', template, 'smtp', duration);
+      
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailFailure('welcome', template, 'smtp', duration, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(userEmail, resetData) {
+    const startTime = Date.now();
+    const operation = 'send_password_reset';
+    const template = 'password-reset';
+
+    try {
+      const templateData = {
+        platformName: process.env.PLATFORM_NAME || 'EdTech Platform',
+        userName: resetData.userName,
+        resetToken: resetData.resetToken,
+        resetUrl: resetData.resetUrl,
+        expiryTime: resetData.expiryTime,
+        requestInfo: resetData.requestInfo,
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@edtech.com',
+        currentYear: new Date().getFullYear()
+      };
+
+      const { html, text } = await this.renderTemplate(template, templateData);
+
+      const mailOptions = {
+        from: `"${process.env.FROM_NAME || 'EdTech Platform'}" <${process.env.FROM_EMAIL || this.config.auth.user}>`,
+        to: userEmail,
+        subject: 'Password Reset Request',
+        html,
+        text,
+        headers: {
+          'X-Priority': '1' // High priority for security emails
+        }
+      };
+
+      const result = await this.sendEmailWithRetry(mailOptions, operation, template);
+      
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailSuccess('password_reset', template, 'smtp', duration);
+      
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailFailure('password_reset', template, 'smtp', duration, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send course enrollment confirmation email
+   */
+  async sendCourseEnrollmentEmail(studentEmail, enrollmentData) {
+    const startTime = Date.now();
+    const operation = 'send_course_enrollment';
+    const template = 'course-enrollment';
+
+    try {
+      const templateData = {
+        platformName: process.env.PLATFORM_NAME || 'EdTech Platform',
+        studentName: enrollmentData.studentName,
+        studentEmail: studentEmail,
+        courseName: enrollmentData.courseName,
+        courseDescription: enrollmentData.courseDescription,
+        instructor: enrollmentData.instructor,
+        duration: enrollmentData.duration,
+        startDate: enrollmentData.startDate,
+        level: enrollmentData.level,
+        totalLessons: enrollmentData.totalLessons,
+        language: enrollmentData.language,
+        instructorInfo: enrollmentData.instructorInfo,
+        paymentInfo: enrollmentData.paymentInfo,
+        baseUrl: process.env.BASE_URL || 'http://localhost:3000',
+        courseId: enrollmentData.courseId,
+        supportEmail: process.env.SUPPORT_EMAIL || 'support@edtech.com',
+        currentYear: new Date().getFullYear()
+      };
+
+      const { html, text } = await this.renderTemplate(template, templateData);
+
+      const mailOptions = {
+        from: `"${process.env.FROM_NAME || 'EdTech Platform'}" <${process.env.FROM_EMAIL || this.config.auth.user}>`,
+        to: studentEmail,
+        subject: `Course Enrollment Confirmed: ${enrollmentData.courseName}`,
+        html,
+        text,
+        headers: {
+          'X-Course-ID': enrollmentData.courseId
+        }
+      };
+
+      const result = await this.sendEmailWithRetry(mailOptions, operation, template);
+      
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailSuccess('course_enrollment', template, 'smtp', duration);
+      
+      return result;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.metrics.recordEmailFailure('course_enrollment', template, 'smtp', duration, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Render email template
+   */
+  async renderTemplate(templateName, data) {
+    const renderStart = Date.now();
+    
+    try {
+      const html = await this.templateEngine.renderTemplate(templateName, data);
+      const text = this.htmlToText(html);
+      
+      const duration = Date.now() - renderStart;
+      this.logger.logTemplateRender(templateName, { duration });
+      this.metrics.recordTemplateRender(templateName, 'success', duration);
+      
+      return { html, text };
+      
+    } catch (error) {
+      const duration = Date.now() - renderStart;
+      this.logger.logTemplateError(templateName, error, { duration });
+      this.metrics.recordTemplateRender(templateName, 'failure', duration);
+      throw error;
+    }
+  }
+
+  /**
+   * Send email with retry logic
+   */
+  async sendEmailWithRetry(mailOptions, operation, template) {
+    const sendEmailFn = async () => {
+      if (!this.transporter) {
+        throw new Error('Email transporter not initialized');
+      }
+      return await this.transporter.sendMail(mailOptions);
+    };
+
+    return await this.retryHandler.execute(
+      sendEmailFn,
+      this,
+      [],
+      {
+        onRetry: (info) => {
+          this.logger.logRetryAttempt(operation, info.attempt, info.error, {
+            template,
+            recipient: mailOptions.to
+          });
+          this.metrics.recordEmailRetry(info.attempt, this.metrics.categorizeError(info.error), template);
+        },
+        onError: (info) => {
+          this.logger.logEmailError(`${operation}_final`, info.error, {
+            template,
+            recipient: mailOptions.to,
+            totalAttempts: info.totalAttempts
+          });
+        }
+      }
+    );
+  }
+
+  /**
+   * Send bulk emails with batch processing
+   */
+  async sendBulkEmails(emailList, batchSize = 10) {
+    const startTime = Date.now();
+    const operation = 'send_bulk_emails';
+    
+    try {
+      this.logger.logBulkOperation(operation, {
+        total: emailList.length,
+        batchSize
+      });
+
+      const results = {
+        total: emailList.length,
+        successful: 0,
+        failed: 0,
+        errors: []
+      };
+
+      // Process emails in batches
+      for (let i = 0; i < emailList.length; i += batchSize) {
+        const batch = emailList.slice(i, i + batchSize);
+        this.metrics.updateQueueSize(emailList.length - i);
+
+        const batchPromises = batch.map(async (emailData) => {
+          try {
+            let result;
+            switch (emailData.type) {
+              case 'teacher_assignment':
+                result = await this.sendTeacherAssignmentEmail(emailData.to, emailData.data);
+                break;
+              case 'notification':
+                result = await this.sendNotificationEmail(emailData.to, emailData.data);
+                break;
+              case 'welcome':
+                result = await this.sendWelcomeEmail(emailData.to, emailData.data);
+                break;
+              case 'password_reset':
+                result = await this.sendPasswordResetEmail(emailData.to, emailData.data);
+                break;
+              case 'course_enrollment':
+                result = await this.sendCourseEnrollmentEmail(emailData.to, emailData.data);
+                break;
+              default:
+                throw new Error(`Unknown email type: ${emailData.type}`);
+            }
+            results.successful++;
+            return { success: true, result };
+          } catch (error) {
+            results.failed++;
+            results.errors.push({
+              email: emailData.to,
+              type: emailData.type,
+              error: error.message
+            });
+            return { success: false, error };
+          }
+        });
+
+        await Promise.allSettled(batchPromises);
+
+        // Add delay between batches to prevent overwhelming the SMTP server
+        if (i + batchSize < emailList.length) {
+          await this.delay(1000); // 1 second delay
+        }
+      }
+
+      this.metrics.updateQueueSize(0);
+      
+      const duration = Date.now() - startTime;
+      this.logger.logBulkOperation(operation, results, { duration });
+      this.metrics.recordBulkOperation('completed', emailList.length, duration);
+
+      return results;
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.logEmailError(operation, error, { duration });
+      this.metrics.recordBulkOperation('failed', emailList.length, duration);
+      throw error;
+    }
+  }
+
+  /**
+   * Convert HTML to plain text
    */
   htmlToText(html) {
+    if (!html) return '';
+    
     return html
-      .replace(/<[^>]*>/g, '') // Remove HTML tags
-      .replace(/&nbsp;/g, ' ') // Replace &nbsp; with space
-      .replace(/&amp;/g, '&') // Replace &amp; with &
-      .replace(/&lt;/g, '<') // Replace &lt; with <
-      .replace(/&gt;/g, '>') // Replace &gt; with >
-      .replace(/&quot;/g, '"') // Replace &quot; with "
-      .replace(/&#39;/g, "'") // Replace &#39; with '
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+      .replace(/<style[^>]*>.*?<\/style>/gis, '')
+      .replace(/<script[^>]*>.*?<\/script>/gis, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
       .trim();
   }
 
   /**
    * Delay function for batch processing
-   * @param {number} ms - Milliseconds to delay
    */
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
-   * Test email configuration
-   * @returns {Promise<boolean>} True if configuration is valid
+   * Get service status
    */
-  async testConnection() {
+  async getStatus() {
     try {
-      if (!this.transporter) {
-        console.log('⚠️  No SMTP configuration found. Email notifications will be logged to console.');
-        return {
-          success: false,
-          message: 'No SMTP configuration found'
-        };
-      }
+      const isConnected = this.transporter ? await this.transporter.verify() : false;
+      const templateStats = this.templateEngine.getStats();
+      const loggerStats = this.logger.getStats();
+      const retryStats = this.retryHandler.getStats();
+      const metricsStats = await this.metrics.getSummaryStats();
 
-      await this.transporter.verify();
-      console.log('✅ Email service connection test successful');
       return {
-        success: true,
-        message: 'Email service connection successful'
+        initialized: this.isInitialized,
+        connected: isConnected,
+        templates: templateStats,
+        logger: loggerStats,
+        retry: retryStats,
+        metrics: metricsStats,
+        config: {
+          host: this.config.host,
+          port: this.config.port,
+          secure: this.config.secure,
+          pool: this.config.pool,
+          maxConnections: this.config.maxConnections
+        }
       };
     } catch (error) {
-      console.error('❌ Email service connection test failed:', error);
+      this.logger.logEmailError('status_check', error);
       return {
-        success: false,
-        message: error.message
+        initialized: this.isInitialized,
+        connected: false,
+        error: error.message
       };
     }
   }
 
   /**
-   * Get email service status
+   * Get metrics endpoint for Prometheus
    */
-  getStatus() {
-    return {
-      configured: !!this.transporter,
-      host: 'gmail',
-      user: process.env.EMAIL_USER || 'Not configured',
-      hasPassword: !!process.env.EMAIL_PASSWORD
-    };
+  async getMetrics() {
+    return await this.metrics.getMetrics();
+  }
+
+  /**
+   * Graceful shutdown
+   */
+  async shutdown() {
+    try {
+      this.logger.logConfig('shutdown_start');
+      
+      if (this.transporter) {
+        this.transporter.close();
+        this.logger.logConnection('closed');
+      }
+      
+      this.templateEngine.clearCache();
+      this.logger.logConfig('shutdown_complete');
+      
+    } catch (error) {
+      this.logger.logEmailError('shutdown', error);
+      throw error;
+    }
   }
 }
 
 // Create singleton instance
 const emailService = new EmailService();
 
-module.exports = emailService;
+module.exports = {
+  EmailService,
+  emailService
+};

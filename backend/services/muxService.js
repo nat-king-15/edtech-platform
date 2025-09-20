@@ -1,5 +1,6 @@
 const Mux = require('@mux/mux-node');
 const { db } = require('../config/firebase');
+const admin = require('firebase-admin');
 const notificationService = require('./notificationService');
 
 // Initialize Mux client
@@ -113,7 +114,7 @@ class MuxService {
           storyboardVttUrl: `https://image.mux.com/${playbackId}/storyboard.vtt`,
           // Video stream URL
           streamUrl: `https://stream.mux.com/${playbackId}.m3u8`,
-          updatedAt: new Date().toISOString()
+          updatedAt: admin.firestore.Timestamp.fromDate(new Date()).toString()
         };
         
         // Add optional metadata only if they exist
@@ -199,7 +200,7 @@ class MuxService {
                 recordingPlaybackId: playbackId,
                 recordingAssetId: asset.id,
                 recordingStatus: 'ready',
-                updatedAt: new Date()
+                updatedAt: admin.firestore.Timestamp.fromDate(new Date())
               });
               console.log(`Updated schedule ${passthrough} with recording metadata: ${playbackId}`);
             } else {
@@ -372,8 +373,8 @@ class MuxService {
           if (scheduleDoc.exists) {
             await db.collection('schedule').doc(scheduleId).update({
               liveStreamStatus: 'active',
-              liveStreamStartedAt: new Date(),
-              updatedAt: new Date()
+              liveStreamStartedAt: admin.firestore.Timestamp.fromDate(new Date()),
+              updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
           } else {
             console.warn(`Schedule document ${scheduleId} not found for live stream start, skipping update`);
@@ -406,8 +407,8 @@ class MuxService {
           if (scheduleDoc.exists) {
             await db.collection('schedule').doc(scheduleId).update({
               liveStreamStatus: 'idle',
-              liveStreamEndedAt: new Date(),
-              updatedAt: new Date()
+              liveStreamEndedAt: admin.firestore.Timestamp.fromDate(new Date()),
+              updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
           } else {
             console.warn(`Schedule document ${scheduleId} not found for live stream end, skipping update`);
@@ -439,7 +440,7 @@ class MuxService {
             await db.collection('schedule').doc(scheduleId).update({
               recordingAssetId: asset.id,
               recordingStatus: 'processing',
-              updatedAt: new Date()
+              updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
             console.log(`Recording asset created for schedule: ${scheduleId}`);
           } else {

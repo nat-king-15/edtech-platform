@@ -1,29 +1,39 @@
 const express = require('express');
 const { admin, firestore, auth, FieldValue } = require('../config/firebase');
 const jwt = require('jsonwebtoken');
+const tokenService = require('../services/tokenService');
+const { authMiddleware } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 // Initialize Firestore
 const db = firestore;
 
-// JWT Secret (must be in environment variables)
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET environment variable is required for security');
+// Function to get JWT secret with error handling
+function getJWTSecret() {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT secret not configured');
+  return s;
 }
 
 // Helper function to generate JWT token
 const generateToken = (user) => {
-  return jwt.sign(
-    {
-      uid: user.uid,
-      email: user.email,
-      role: user.role,
-      displayName: user.displayName
-    },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  try {
+    return jwt.sign(
+      {
+        uid: user.uid,
+        email: user.email,
+        role: user.role,
+        displayName: user.displayName
+      },
+      getJWTSecret(),
+      { expiresIn: '7d' }
+    );
+  } catch (error) {
+    if (error.message === 'JWT secret not configured') {
+      throw new Error('Token generation failed');
+    }
+    throw error;
+  }
 };
 
 // Register new user
@@ -122,12 +132,26 @@ router.post('/register', async (req, res) => {
     await db.collection('users').doc(userRecord.uid).set(userData);
 
     // Generate JWT token
-    const token = generateToken({
-      uid: userRecord.uid,
-      email,
-      role,
-      displayName
-    });
+    let token;
+    try {
+      token = generateToken({
+        uid: userRecord.uid,
+        email,
+        role,
+        displayName
+      });
+    } catch (error) {
+      if (error.message === 'Token generation failed') {
+        return res.status(500).json({
+          success: false,
+          error: {
+            code: 'SERVER_ERROR',
+            message: 'Internal server error'
+          }
+        });
+      }
+      throw error;
+    }
 
     res.status(201).json({
       success: true,
@@ -144,7 +168,7 @@ router.post('/register', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Registration error');
     
     let errorMessage = 'Registration failed';
     let errorCode = 'REGISTRATION_ERROR';
@@ -217,16 +241,30 @@ router.post('/login', async (req, res) => {
     }
 
     // Generate JWT token
-    const token = generateToken({
-      uid: userRecord.uid,
-      email: userRecord.email,
-      role: userData.role,
-      displayName: userRecord.displayName
-    });
+    let token;
+    try {
+      token = generateToken({
+        uid: userRecord.uid,
+        email: userRecord.email,
+        role: userData.role,
+        displayName: userRecord.displayName
+      });
+    } catch (error) {
+      if (error.message === 'Token generation failed') {
+        return res.status(500).json({
+          success: false,
+          error: {
+            code: 'SERVER_ERROR',
+            message: 'Internal server error'
+          }
+        });
+      }
+      throw error;
+    }
 
     // Update last login
     await db.collection('users').doc(userRecord.uid).update({
-      lastLogin: admin.firestore.FieldValue.serverTimestamp()
+      lastLogin: FieldValue.serverTimestamp()
     });
 
     res.json({
@@ -244,7 +282,7 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error');
     
     let errorMessage = 'Login failed';
     let errorCode = 'LOGIN_ERROR';
@@ -268,35 +306,15 @@ router.post('/login', async (req, res) => {
 });
 
 // Get current user profile
-router.get('/profile', async (req, res) => {
+router.get('/profile', authMiddleware, async (req, res) => {
   try {
-    console.log('👤 Profile endpoint hit');
-    const authHeader = req.headers.authorization;
-    console.log('👤 Auth header present:', !!authHeader);
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Profile: Missing auth header');
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authorization token required'
-        }
-      });
-    }
-
-    const token = authHeader.substring(7);
-    console.log('👤 JWT Token length:', token?.length || 0);
-    const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('👤 JWT decoded successfully for user:', decoded.uid);
-    console.log('🔄 About to fetch from Firestore...');
+    // Use req.user from authMiddleware
+    const uid = req.user.uid;
     
     // Get user data from Firestore
-    console.log('👤 Fetching user from Firestore for UID:', decoded.uid);
-    const userDoc = await db.collection('users').doc(decoded.uid).get();
+    const userDoc = await db.collection('users').doc(uid).get();
     
     if (!userDoc.exists) {
-      console.log('❌ User document not found in Firestore for UID:', decoded.uid);
       return res.status(404).json({
         success: false,
         error: {
@@ -305,11 +323,8 @@ router.get('/profile', async (req, res) => {
         }
       });
     }
-    
-    console.log('✅ User document found in Firestore');
 
     const userData = userDoc.data();
-    console.log('👤 User data from Firestore:', { uid: decoded.uid, role: userData.role, email: userData.email });
     
     // Remove sensitive data
     delete userData.preferences;
@@ -323,19 +338,9 @@ router.get('/profile', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Profile endpoint error:', error.message);
-    console.error('❌ Full error stack:', error);
+    console.error('Profile endpoint error');
     
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid authorization token'
-        }
-      });
-    }
-
+    // Do not leak internal error details
     res.status(500).json({
       success: false,
       error: {
@@ -347,40 +352,28 @@ router.get('/profile', async (req, res) => {
 });
 
 // Update user profile
-router.put('/profile', async (req, res) => {
+router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authorization token required'
-        }
-      });
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET);
+    // Use req.user from authMiddleware
+    const uid = req.user.uid;
     
     const { displayName, profile } = req.body;
     
     const updateData = {
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      updatedAt: FieldValue.serverTimestamp()
     };
     
     if (displayName) {
       updateData.displayName = displayName;
       // Also update in Firebase Auth
-      await admin.auth().updateUser(decoded.uid, { displayName });
+      await admin.auth().updateUser(uid, { displayName });
     }
     
     if (profile) {
       updateData.profile = profile;
     }
     
-    await db.collection('users').doc(decoded.uid).update(updateData);
+    await db.collection('users').doc(uid).update(updateData);
     
     res.json({
       success: true,
@@ -390,18 +383,9 @@ router.put('/profile', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Profile update error:', error);
+    console.error('Profile update error');
     
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid authorization token'
-        }
-      });
-    }
-
+    // Do not leak internal error details
     res.status(500).json({
       success: false,
       error: {

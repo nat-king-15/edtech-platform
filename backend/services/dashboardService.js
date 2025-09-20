@@ -1,4 +1,5 @@
 const { firestore } = require('../config/firebase');
+const admin = require('firebase-admin');
 const contentService = require('./contentService');
 const announcementService = require('./announcementService');
 const analyticsService = require('./analyticsService');
@@ -30,7 +31,7 @@ class DashboardService {
           recentActivity,
           announcements,
           progressStats,
-          timestamp: new Date().toISOString()
+          timestamp: admin.firestore.Timestamp.fromDate(new Date())
         }
       };
     } catch (error) {
@@ -111,7 +112,7 @@ class DashboardService {
             progress: progress,
             subjects: batchData.subjects || [],
             totalSubjects: batchData.subjects ? batchData.subjects.length : 0,
-            isActive: new Date() < new Date(enrollmentData.expiryDate)
+            isActive: admin.firestore.Timestamp.fromDate(new Date()) < admin.firestore.Timestamp.fromDate(new Date(enrollmentData.expiryDate))
           });
         }
       }
@@ -251,9 +252,9 @@ class DashboardService {
    */
   async getProgressStatistics(userId) {
     try {
-      const now = new Date();
-      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const now = admin.firestore.Timestamp.fromDate(new Date());
+      const startOfWeek = admin.firestore.Timestamp.fromDate(new Date(now.toDate().setDate(now.toDate().getDate() - now.toDate().getDay())));
+      const startOfMonth = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getFullYear(), now.toDate().getMonth(), 1));
 
       // Get weekly progress
       const weeklyProgressSnapshot = await this.db.collection('user_activities')
@@ -355,7 +356,7 @@ class DashboardService {
       let tempStreak = 0;
       
       const today = new Date().toISOString().split('T')[0];
-      let expectedDate = new Date();
+      let expectedDate = admin.firestore.Timestamp.fromDate(new Date());
 
       // Calculate current streak
       for (let i = 0; i < sortedDates.length; i++) {
@@ -431,7 +432,7 @@ class DashboardService {
         batchName: activityData.batchName,
         subjectId: activityData.subjectId,
         subjectName: activityData.subjectName,
-        timestamp: new Date(),
+        timestamp: admin.firestore.Timestamp.fromDate(new Date()),
         metadata: activityData.metadata || {}
       };
 
@@ -492,7 +493,7 @@ class DashboardService {
    */
   async getTodayActivity(userId) {
     try {
-      const today = new Date();
+      const today = admin.firestore.Timestamp.fromDate(new Date());
       today.setHours(0, 0, 0, 0);
       
       const tomorrow = new Date(today);

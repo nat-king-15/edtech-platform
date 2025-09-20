@@ -199,7 +199,7 @@ router.post('/',
         batchName: req.body.batchName,
         priority: req.body.priority || 'normal',
         type: req.body.type || 'general',
-        scheduleTime: req.body.scheduleTime ? new Date(req.body.scheduleTime) : new Date(),
+        scheduleTime: req.body.scheduleTime ? admin.firestore.Timestamp.fromDate(new Date(req.body.scheduleTime)) : admin.firestore.Timestamp.fromDate(new Date()),
         attachment: req.body.attachment || null
       };
       
@@ -241,7 +241,7 @@ router.put('/:announcementId',
       const { announcementId } = req.params;
       const updateData = {
         ...req.body,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       };
       
       if (req.body.scheduleTime) {
@@ -316,8 +316,8 @@ router.get('/stats/batch/:batchId',
       const { batchId } = req.params;
       const days = parseInt(req.query.days) || 30;
       
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
+      const startDate = admin.firestore.Timestamp.fromDate(new Date());
+      startDate.toDate().setDate(startDate.toDate().getDate() - days);
       
       const { firestore } = require('../config/firebase');
       

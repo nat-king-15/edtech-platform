@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Enrollment Confirmation - {{platformName}}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 10px;
+        }
+        .title {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .content {
+            margin-bottom: 30px;
+        }
+        .success-banner {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin: 25px 0;
+        }
+        .success-banner h2 {
+            margin: 0 0 10px 0;
+            font-size: 24px;
+        }
+        .success-banner p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .course-card {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 4px solid #007bff;
+        }
+        .course-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .course-image {
+            width: 80px;
+            height: 80px;
+            background-color: #007bff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        .course-info h3 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 20px;
+        }
+        .course-info p {
+            margin: 0;
+            color: #6c757d;
+        }
+        .course-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .detail-item {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+        .detail-item .label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        .detail-item .value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #007bff;
+            color: white;
+            padding: 15px 35px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .cta-button:hover {
+            background-color: #0056b3;
+        }
+        .next-steps {
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-left: 4px solid #2196f3;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .next-steps h4 {
+            color: #1976d2;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .step-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .step-list li {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            color: #1976d2;
+        }
+        .step-list li:last-child {
+            margin-bottom: 0;
+        }
+        .step-number {
+            background-color: #2196f3;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        .instructor-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+        }
+        .instructor-avatar {
+            width: 60px;
+            height: 60px;
+            background-color: #6c757d;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .instructor-details h4 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+        }
+        .instructor-details p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .payment-info {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .payment-info h4 {
+            color: #155724;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .payment-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .payment-item {
+            display: flex;
+            justify-content: space-between;
+            color: #155724;
+            font-size: 14px;
+            padding: 5px 0;
+        }
+        .footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+            .course-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .course-image {
+                margin: 0 auto 15px auto;
+            }
+            .course-details {
+                grid-template-columns: 1fr;
+            }
+            .instructor-info {
+                flex-direction: column;
+                text-align: center;
+            }
+            .instructor-avatar {
+                margin: 0 auto 15px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{platformName}}</div>
+            <h1 class="title">Enrollment Confirmed!</h1>
+            <p class="subtitle">Welcome to your new learning journey</p>
+        </div>
+
+        <div class="content">
+            <div class="success-banner">
+                <h2>🎉 Congratulations {{capitalize studentName}}!</h2>
+                <p>You've successfully enrolled in your new course</p>
+            </div>
+
+            <p>Thank you for choosing {{platformName}} for your learning journey. We're excited to have you as part of our community!</p>
+
+            <div class="course-card">
+                <div class="course-header">
+                    <div class="course-image">
+                        {{#if courseImage}}
+                        <img src="{{courseImage}}" alt="{{courseName}}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">
+                        {{else}}
+                        📚
+                        {{/if}}
+                    </div>
+                    <div class="course-info">
+                        <h3>{{courseName}}</h3>
+                        <p>{{courseDescription}}</p>
+                    </div>
+                </div>
+
+                <div class="course-details">
+                    {{#if instructor}}
+                    <div class="detail-item">
+                        <div class="label">Instructor</div>
+                        <div class="value">{{instructor}}</div>
+                    </div>
+                    {{/if}}
+
+                    {{#if duration}}
+                    <div class="detail-item">
+                        <div class="label">Duration</div>
+                        <div class="value">{{duration}}</div>
+                    </div>
+                    {{/if}}
+
+                    {{#if startDate}}
+                    <div class="detail-item">
+                        <div class="label">Start Date</div>
+                        <div class="value">{{formatDate startDate}}</div>
+                    </div>
+                    {{/if}}
+
+                    {{#if level}}
+                    <div class="detail-item">
+                        <div class="label">Level</div>
+                        <div class="value">{{capitalize level}}</div>
+                    </div>
+                    {{/if}}
+
+                    {{#if totalLessons}}
+                    <div class="detail-item">
+                        <div class="label">Lessons</div>
+                        <div class="value">{{totalLessons}}</div>
+                    </div>
+                    {{/if}}
+
+                    {{#if language}}
+                    <div class="detail-item">
+                        <div class="label">Language</div>
+                        <div class="value">{{language}}</div>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+
+            {{#if instructorInfo}}
+            <div class="instructor-info">
+                <div class="instructor-avatar">
+                    {{#if instructorInfo.avatar}}
+                    <img src="{{instructorInfo.avatar}}" alt="{{instructorInfo.name}}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                    {{else}}
+                    👨‍🏫
+                    {{/if}}
+                </div>
+                <div class="instructor-details">
+                    <h4>Meet Your Instructor: {{instructorInfo.name}}</h4>
+                    <p>{{instructorInfo.bio}}</p>
+                    {{#if instructorInfo.experience}}
+                    <p><strong>Experience:</strong> {{instructorInfo.experience}}</p>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+
+            {{#if paymentInfo}}
+            <div class="payment-info">
+                <h4>💳 Payment Confirmation</h4>
+                <div class="payment-details">
+                    {{#if paymentInfo.amount}}
+                    <div class="payment-item">
+                        <span>Amount Paid:</span>
+                        <span><strong>{{formatCurrency paymentInfo.amount}}</strong></span>
+                    </div>
+                    {{/if}}
+                    {{#if paymentInfo.transactionId}}
+                    <div class="payment-item">
+                        <span>Transaction ID:</span>
+                        <span>{{paymentInfo.transactionId}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if paymentInfo.method}}
+                    <div class="payment-item">
+                        <span>Payment Method:</span>
+                        <span>{{paymentInfo.method}}</span>
+                    </div>
+                    {{/if}}
+                    {{#if paymentInfo.date}}
+                    <div class="payment-item">
+                        <span>Payment Date:</span>
+                        <span>{{formatDate paymentInfo.date}}</span>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{{baseUrl}}/courses/{{courseId}}" class="cta-button">Start Learning Now</a>
+            </div>
+
+            <div class="next-steps">
+                <h4>🚀 What's Next?</h4>
+                <ol class="step-list">
+                    <li>
+                        <div class="step-number">1</div>
+                        <div>
+                            <strong>Access Your Course:</strong> Click the button above or visit your dashboard to start learning immediately.
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">2</div>
+                        <div>
+                            <strong>Download Materials:</strong> Access course materials, assignments, and resources from your course page.
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">3</div>
+                        <div>
+                            <strong>Join the Community:</strong> Connect with fellow students in the course discussion forum.
+                        </div>
+                    </li>
+                    <li>
+                        <div class="step-number">4</div>
+                        <div>
+                            <strong>Track Progress:</strong> Monitor your learning progress and complete assignments on time.
+                        </div>
+                    </li>
+                </ol>
+            </div>
+
+            {{#if additionalInfo}}
+            <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-left: 4px solid #ffc107; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <h4 style="color: #856404; margin-top: 0;">📋 Important Information</h4>
+                <p style="color: #856404; margin-bottom: 0;">{{additionalInfo}}</p>
+            </div>
+            {{/if}}
+
+            <p>We're here to support you throughout your learning journey. If you have any questions or need assistance, don't hesitate to reach out to our support team.</p>
+
+            <p>Happy learning!<br>
+            <strong>The {{platformName}} Team</strong></p>
+        </div>
+
+        <div class="footer">
+            <p>Enrollment confirmation sent to {{studentEmail}}</p>
+            <p>Need help? Contact us at <a href="mailto:{{supportEmail}}">{{supportEmail}}</a></p>
+            <p>Visit your <a href="{{baseUrl}}/dashboard">dashboard</a> to manage your courses</p>
+            <p>&copy; {{currentYear}} {{platformName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

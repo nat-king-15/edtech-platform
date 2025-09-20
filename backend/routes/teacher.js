@@ -488,7 +488,7 @@ router.put('/subjects/:subjectId', authMiddleware, requireTeacher, async (req, r
     // Update subject description
     const updateData = {
       description: description ? description.trim() : '',
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     await firestore.collection('subjects').doc(subjectId).update(updateData);
@@ -563,11 +563,11 @@ router.post('/generate-upload-url', authMiddleware, requireTeacher, async (req, 
       subjectId,
       title: title.trim(),
       contentType,
-      scheduledAt: new Date(),
+      scheduledAt: admin.firestore.Timestamp.fromDate(new Date()),
       status: 'uploading',
       teacherId: req.user.uid,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     const scheduleRef = await firestore.collection('schedule').add(scheduleData);
@@ -737,11 +737,11 @@ router.post('/schedule', authMiddleware, requireTeacher, async (req, res) => {
       subjectId,
       title: title.trim(),
       contentType,
-      scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
+      scheduledAt: scheduledAt ? admin.firestore.Timestamp.fromDate(new Date(scheduledAt)) : admin.firestore.Timestamp.fromDate(new Date()),
       status: pdfContentTypes.includes(contentType) ? 'ready' : 'pending',
       teacherId: req.user.uid,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     // Add fileUrl for PDF content
@@ -1631,8 +1631,8 @@ router.post('/subjects/:subjectId/chapters', authMiddleware, requireTeacher, asy
       resources: Array.isArray(resources) ? resources : [],
       schedule: schedule || null,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date()),
       createdBy: teacherId
     };
 
@@ -1747,7 +1747,7 @@ router.put('/chapters/:chapterId', authMiddleware, requireTeacher, async (req, r
 
     // Prepare update data
     const updateData = {
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     if (title !== undefined) updateData.title = title.trim();
@@ -1815,7 +1815,7 @@ router.delete('/chapters/:chapterId', authMiddleware, requireTeacher, async (req
     // Soft delete by setting isActive to false
     await firestore.collection('chapters').doc(chapterId).update({
       isActive: false,
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.status(200).json({
@@ -1871,7 +1871,7 @@ router.put('/chapters/:chapterId/publish', authMiddleware, requireTeacher, async
 
     await firestore.collection('chapters').doc(chapterId).update({
       isPublished: isPublished,
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.status(200).json({
@@ -2032,8 +2032,8 @@ router.post('/subjects/:subjectId/chapters/:chapterId/topics', authMiddleware, r
       objectives: Array.isArray(objectives) ? objectives : [],
       duration: duration ? parseInt(duration) : null,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date()),
       createdBy: teacherId
     };
 
@@ -2098,7 +2098,7 @@ router.put('/topics/:topicId', authMiddleware, requireTeacher, async (req, res) 
 
     // Prepare update data
     const updateData = {
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     if (title !== undefined) updateData.title = title.trim();
@@ -2163,7 +2163,7 @@ router.delete('/topics/:topicId', authMiddleware, requireTeacher, async (req, re
     // Soft delete by setting isActive to false
     await firestore.collection('topics').doc(topicId).update({
       isActive: false,
-      updatedAt: new Date().toISOString()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.status(200).json({
@@ -2224,11 +2224,11 @@ router.post('/generate-upload-url', authMiddleware, requireTeacher, async (req, 
       title,
       chapterId,
       contentType,
-      scheduledAt: new Date(scheduledAt),
+      scheduledAt: admin.firestore.Timestamp.fromDate(new Date(scheduledAt)),
       status: 'UPLOADING',
       teacherId,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     // Generate Mux upload URL
@@ -2330,13 +2330,13 @@ router.post('/upload-content', authMiddleware, requireTeacher, upload.single('fi
       description: description || '',
       chapterId,
       contentType,
-      scheduledAt: new Date(scheduledAt),
+      scheduledAt: admin.firestore.Timestamp.fromDate(new Date(scheduledAt)),
       status: 'READY',
       teacherId,
       fileUrl,
       fileName,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.json({
@@ -2503,8 +2503,8 @@ router.put('/content/:contentId', authMiddleware, requireTeacher, async (req, re
     await firestore.collection('schedule').doc(contentId).update({
       title: title.trim(),
       description: description ? description.trim() : '',
-      scheduledAt: new Date(scheduledAt),
-      updatedAt: new Date()
+      scheduledAt: admin.firestore.Timestamp.fromDate(new Date(scheduledAt)),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.json({
@@ -2654,8 +2654,8 @@ router.post('/schedule-live-topic', authMiddleware, requireTeacher, async (req, 
       scheduledAt: scheduledDate,
       status: 'scheduled',
       liveStreamStatus: 'scheduled',
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     const scheduleRef = await firestore.collection('schedule').add(scheduleData);
@@ -2680,7 +2680,7 @@ router.post('/schedule-live-topic', authMiddleware, requireTeacher, async (req, 
         livePlaybackIds: liveStreamData.playbackIds,
         rtmpUrl: liveStreamData.rtmpUrl,
         liveStreamStatus: 'ready',
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       console.log(`✅ Live stream created successfully for schedule: ${scheduleRef.id}`);
@@ -2690,7 +2690,7 @@ router.post('/schedule-live-topic', authMiddleware, requireTeacher, async (req, 
       await firestore.collection('schedule').doc(scheduleRef.id).update({
         status: 'mux_failed',
         error: muxError.message,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
     }
     
@@ -2703,7 +2703,7 @@ router.post('/schedule-live-topic', authMiddleware, requireTeacher, async (req, 
       message: 'Live topic scheduled successfully',
       data: {
         scheduleId: scheduleRef.id,
-        scheduledAt: scheduledDate.toISOString()
+        scheduledAt: admin.firestore.Timestamp.fromDate(scheduledDate)
       }
     });
   } catch (error) {
@@ -2815,13 +2815,13 @@ router.put('/live-topic/:scheduleId', authMiddleware, requireTeacher, async (req
 
     // Prepare update data
     const updateData = {
-      updatedAt: new Date()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     };
 
     if (title) updateData.title = title.trim();
     if (description !== undefined) updateData.description = description.trim();
     if (scheduledAt) {
-      updateData.scheduledAt = new Date(scheduledAt);
+      updateData.scheduledAt = admin.firestore.Timestamp.fromDate(new Date(scheduledAt));
       
       // Update scheduler service
       const schedulerService = require('../services/schedulerService');
@@ -3011,7 +3011,7 @@ router.post('/live-topics/:liveTopicId/start', authMiddleware, requireTeacher, a
     await firestore.collection('schedule').doc(liveTopicId).update({
       liveStreamStatus: 'live',
       status: 'live',
-      updatedAt: new Date()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.json({
@@ -3068,7 +3068,7 @@ router.post('/live-topics/:liveTopicId/end', authMiddleware, requireTeacher, asy
     await firestore.collection('schedule').doc(liveTopicId).update({
       liveStreamStatus: 'ended',
       status: 'ended',
-      updatedAt: new Date()
+      updatedAt: admin.firestore.Timestamp.fromDate(new Date())
     });
 
     res.json({
@@ -3178,7 +3178,11 @@ router.put('/notifications/:notificationId/read', authMiddleware, requireTeacher
     if (!notificationDoc.exists) {
       return res.status(404).json({
         success: false,
-        error: { message: 'Notification not found' }
+        error: {
+          code: 'NOTIFICATION_NOT_FOUND',
+          message: 'Notification not found'
+        },
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
     }
 
@@ -3186,7 +3190,11 @@ router.put('/notifications/:notificationId/read', authMiddleware, requireTeacher
     if (notificationData.userId !== teacherId) {
       return res.status(403).json({
         success: false,
-        error: { message: 'Access denied' }
+        error: {
+          code: 'ACCESS_DENIED',
+          message: 'Access denied'
+        },
+        timestamp: admin.firestore.Timestamp.fromDate(new Date())
       });
     }
 
@@ -3197,13 +3205,18 @@ router.put('/notifications/:notificationId/read', authMiddleware, requireTeacher
 
     res.json({
       success: true,
-      message: 'Notification marked as read'
+      message: 'Notification marked as read',
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to mark notification as read' }
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to mark notification as read'
+      },
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -3234,13 +3247,20 @@ router.put('/notifications/mark-all-read', authMiddleware, requireTeacher, async
     res.json({
       success: true,
       message: 'All notifications marked as read',
-      updatedCount: snapshot.size
+      data: {
+        updatedCount: snapshot.size
+      },
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     res.status(500).json({
       success: false,
-      error: { message: 'Failed to mark all notifications as read' }
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Failed to mark all notifications as read'
+      },
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -3336,7 +3356,7 @@ router.get('/assignments/stats', authMiddleware, requireTeacher, async (req, res
         thisWeekAssignments,
         overdueAssignments
       },
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
     
   } catch (error) {
@@ -3347,7 +3367,7 @@ router.get('/assignments/stats', authMiddleware, requireTeacher, async (req, res
         code: 'ASSIGNMENT_STATS_ERROR',
         message: 'Failed to fetch assignment statistics'
       },
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -3452,7 +3472,7 @@ router.get('/assignments', authMiddleware, requireTeacher, async (req, res) => {
     res.json({
       success: true,
       data: assignments,
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
     
   } catch (error) {
@@ -3463,7 +3483,7 @@ router.get('/assignments', authMiddleware, requireTeacher, async (req, res) => {
         code: 'ASSIGNMENTS_FETCH_ERROR',
         message: 'Failed to fetch assignments'
       },
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -3550,7 +3570,7 @@ router.get('/assignments/submissions', authMiddleware, requireTeacher, async (re
     res.json({
       success: true,
       data: submissions,
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
     
   } catch (error) {
@@ -3561,7 +3581,7 @@ router.get('/assignments/submissions', authMiddleware, requireTeacher, async (re
         code: 'SUBMISSIONS_FETCH_ERROR',
         message: 'Failed to fetch assignment submissions'
       },
-      timestamp: new Date().toISOString()
+      timestamp: admin.firestore.Timestamp.fromDate(new Date())
     });
   }
 });
@@ -3737,7 +3757,7 @@ router.post('/subjects/:subjectId/chapters/:chapterId/topics/:topicId/content/vi
       title: title.trim(),
       description: description ? description.trim() : '',
       status: 'processing',
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: admin.firestore.Timestamp.fromDate(new Date()),
       muxUploadId: uploadTimestamp.toString(), // Store the timestamp as uploadId for webhook matching
       teacherId
     };
@@ -3817,7 +3837,7 @@ router.post('/subjects/:subjectId/chapters/:chapterId/topics/:topicId/content/no
       fileName: file.originalname,
       fileType: file.mimetype === 'application/pdf' ? 'pdf' : 'doc',
       fileSize: file.size,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: admin.firestore.Timestamp.fromDate(new Date()),
       teacherId
     };
 
@@ -3880,7 +3900,7 @@ router.post('/subjects/:subjectId/chapters/:chapterId/topics/:topicId/content/dp
       timeLimit: timeLimit || 60,
       totalMarks: totalMarks || questions.length,
       isPublished: false,
-      createdAt: new Date().toISOString(),
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
       teacherId
     };
 
@@ -3952,7 +3972,7 @@ router.post('/subjects/:subjectId/chapters/:chapterId/topics/:topicId/content/dp
       description: description ? description.trim() : '',
       dppId: dppId || '',
       status: 'processing',
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: admin.firestore.Timestamp.fromDate(new Date()),
       muxUploadId: uploadTimestamp.toString(), // Store the timestamp as uploadId for webhook matching
       teacherId
     };

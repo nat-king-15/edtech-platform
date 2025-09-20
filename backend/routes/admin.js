@@ -1,5 +1,6 @@
 const express = require('express');
 const { auth, firestore, storage, FieldValue } = require('../config/firebase');
+const { Timestamp } = require('firebase-admin/firestore');
 const { authMiddleware, requireAdmin } = require('../middleware/authMiddleware');
 const { validateRequest } = require('../middleware/validation');
 const { body, param, query } = require('express-validator');
@@ -90,7 +91,7 @@ router.post('/users/:uid/set-role',
       email: userRecord.email,
       name: userRecord.displayName || userRecord.email.split('@')[0],
       role: role,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Timestamp.fromDate(new Date()),
       updatedBy: req.user.uid
     }, { merge: true });
 
@@ -106,7 +107,7 @@ router.post('/users/:uid/set-role',
         uid: uid,
         email: userRecord.email,
         role: role,
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.fromDate(new Date())
       }
     });
 
@@ -296,7 +297,7 @@ router.put('/users/:uid/status', authMiddleware, requireAdmin, async (req, res) 
     const userDocRef = firestore.collection('users').doc(uid);
     await userDocRef.set({
       disabled: disabled,
-      updatedAt: new Date().toISOString(),
+      updatedAt: Timestamp.fromDate(new Date()),
       updatedBy: req.user.uid
     }, { merge: true });
 
@@ -312,7 +313,7 @@ router.put('/users/:uid/status', authMiddleware, requireAdmin, async (req, res) 
         uid: uid,
         email: userRecord.email,
         disabled: disabled,
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.fromDate(new Date())
       }
     });
 
@@ -463,8 +464,8 @@ router.post('/courses',
       description: description ? description.trim() : '',
       tags: Array.isArray(tags) ? tags : [],
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date()),
       createdBy: req.user.uid
     };
 
@@ -588,8 +589,8 @@ router.post('/batches', authMiddleware, requireAdmin, async (req, res) => {
       startDate: startDateTime,
       status: status,
       currentStudents: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date()),
       createdBy: req.user.uid
     };
 
@@ -759,7 +760,7 @@ router.put('/batches/:batchId', authMiddleware, requireAdmin, async (req, res) =
     delete updateData.currentStudents; // This should be managed separately
 
     // Add update timestamp
-    updateData.updatedAt = new Date().toISOString();
+    updateData.updatedAt = Timestamp.fromDate(new Date());
 
     // Update the batch
     await firestore.collection('batches').doc(batchId).update(updateData);
@@ -929,7 +930,7 @@ router.put('/courses/:courseId', authMiddleware, requireAdmin, async (req, res) 
 
     // Prepare update data
     const updateData = {
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     };
 
     if (title) updateData.title = title.trim();
@@ -1301,7 +1302,7 @@ router.post('/batches/:batchId/subjects', authMiddleware, requireAdmin, async (r
 
       teacherName = teacherData.displayName || teacherData.name || teacherData.email.split('@')[0];
       teacherEmail = teacherData.email;
-      assignedAt = new Date().toISOString();
+      assignedAt = Timestamp.fromDate(new Date());
       assignedBy = req.user.uid;
     }
 
@@ -1314,8 +1315,8 @@ router.post('/batches/:batchId/subjects', authMiddleware, requireAdmin, async (r
       teacherName: teacherName,
       teacherEmail: teacherEmail,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date()),
       createdBy: req.user.uid,
       assignedAt: assignedAt,
       assignedBy: assignedBy
@@ -1335,7 +1336,7 @@ router.post('/batches/:batchId/subjects', authMiddleware, requireAdmin, async (r
             assignedAt: assignedAt,
             isActive: true
           },
-          updatedAt: new Date().toISOString()
+          updatedAt: Timestamp.fromDate(new Date())
         });
         console.log('✅ Updated teacher user document with subject assignment');
       } catch (error) {
@@ -1457,9 +1458,9 @@ router.put('/subjects/:subjectId/assign-teacher', authMiddleware, requireAdmin, 
       teacherId: teacherId,
       teacherName: teacherName.trim(),
       teacherEmail: teacherEmail.trim().toLowerCase(),
-      assignedAt: new Date().toISOString(),
+      assignedAt: Timestamp.fromDate(new Date()),
       assignedBy: req.user.uid,
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     };
 
     await firestore.collection('subjects').doc(subjectId).update(updateData);
@@ -1475,7 +1476,7 @@ router.put('/subjects/:subjectId/assign-teacher', authMiddleware, requireAdmin, 
           assignedAt: updateData.assignedAt,
           isActive: true
         },
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.fromDate(new Date())
       });
       console.log('✅ Updated teacher user document with subject assignment');
     } catch (error) {
@@ -1792,7 +1793,7 @@ router.put('/subjects/:subjectId', authMiddleware, requireAdmin, async (req, res
     const updateData = {
       title: title.trim(),
       description: description?.trim() || '',
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     };
 
     // Handle teacher assignment if teacherId is provided in request body
@@ -1818,7 +1819,7 @@ router.put('/subjects/:subjectId', authMiddleware, requireAdmin, async (req, res
         updateData.teacherId = teacherId.trim();
         updateData.teacherName = teacherData.displayName || teacherData.name || teacherData.email.split('@')[0];
         updateData.teacherEmail = teacherData.email;
-        updateData.assignedAt = new Date().toISOString();
+        updateData.assignedAt = Timestamp.fromDate(new Date());
         updateData.assignedBy = req.user.uid;
       } else {
         // Remove teacher assignment (teacherId is null or empty string)
@@ -1845,7 +1846,7 @@ router.put('/subjects/:subjectId', authMiddleware, requireAdmin, async (req, res
           const oldTeacherRef = firestore.collection('users').doc(oldTeacherId.trim());
           await oldTeacherRef.update({
             [`assignedSubjects.${subjectId}`]: FieldValue.delete(),
-            updatedAt: new Date().toISOString()
+            updatedAt: Timestamp.fromDate(new Date())
           });
           console.log('✅ Removed subject from old teacher user document');
         } catch (error) {
@@ -1865,7 +1866,7 @@ router.put('/subjects/:subjectId', authMiddleware, requireAdmin, async (req, res
               assignedAt: updateData.assignedAt,
               isActive: true
             },
-            updatedAt: new Date().toISOString()
+            updatedAt: Timestamp.fromDate(new Date())
           });
           console.log('✅ Added subject to new teacher user document');
         } catch (error) {
@@ -1924,7 +1925,7 @@ router.delete('/subjects/:subjectId', authMiddleware, requireAdmin, async (req, 
     // Soft delete by setting isActive to false
     await firestore.collection('subjects').doc(subjectId).update({
       isActive: false,
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     });
 
     res.status(200).json({
@@ -2213,7 +2214,7 @@ router.post('/batches/:batchId/announcements', authMiddleware, requireAdmin, asy
       batchId: batchId,
       title: title.trim(),
       content: content.trim(),
-      createdAt: new Date(),
+      createdAt: admin.firestore.Timestamp.fromDate(new Date()),
       createdBy: req.user.uid,
       global: false
     };
@@ -2326,8 +2327,9 @@ router.get('/dashboard/stats', authMiddleware, requireAdmin, async (req, res) =>
       else if (role === 'admin') adminCount++;
       
       // Check if user was active in last 30 days
-      if (userData.lastLoginAt && new Date(userData.lastLoginAt) > thirtyDaysAgo) {
-        activeUsers++;
+      if (userData.lastLogin) {
+        const last = userData.lastLogin?.toDate?.() || new Date(userData.lastLogin);
+        if (last > thirtyDaysAgo) activeUsers++;
       }
     });
     
@@ -2355,7 +2357,7 @@ router.get('/dashboard/stats', authMiddleware, requireAdmin, async (req, res) =>
         
         // Calculate monthly revenue
         if (enrollmentData.enrolledAt) {
-          const enrollmentDate = new Date(enrollmentData.enrolledAt);
+          const enrollmentDate = enrollmentData.enrolledAt?.toDate?.() || new Date(enrollmentData.enrolledAt);
           if (enrollmentDate.getMonth() === currentMonth && enrollmentDate.getFullYear() === currentYear) {
             monthlyRevenue += enrollmentData.amount;
           }
@@ -2368,7 +2370,7 @@ router.get('/dashboard/stats', authMiddleware, requireAdmin, async (req, res) =>
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     
     const recentUsersSnapshot = await firestore.collection('users')
-      .where('createdAt', '>=', sevenDaysAgo.toISOString())
+      .where('createdAt', '>=', Timestamp.fromDate(sevenDaysAgo))
       .orderBy('createdAt', 'desc')
       .limit(5)
       .get();
@@ -2381,7 +2383,7 @@ router.get('/dashboard/stats', authMiddleware, requireAdmin, async (req, res) =>
         name: userData.name || userData.email?.split('@')[0] || 'Unknown',
         email: userData.email,
         role: userData.role || 'student',
-        createdAt: userData.createdAt
+        createdAt: userData.createdAt?.toDate?.() || new Date(userData.createdAt)
       });
     });
     
@@ -2398,7 +2400,7 @@ router.get('/dashboard/stats', authMiddleware, requireAdmin, async (req, res) =>
         id: doc.id,
         title: courseData.title,
         category: courseData.category,
-        createdAt: courseData.createdAt,
+        createdAt: courseData.createdAt?.toDate?.() || new Date(courseData.createdAt),
         isActive: courseData.isActive
       });
     });
@@ -2485,7 +2487,7 @@ router.get('/analytics/enrollments', authMiddleware, requireAdmin, async (req, r
     
     // Build query for enrollments
     let enrollmentQuery = firestore.collection('enrollments')
-      .where('enrolledAt', '>=', startDate.toISOString())
+      .where('enrolledAt', '>=', Timestamp.fromDate(startDate))
       .orderBy('enrolledAt', 'desc');
     
     if (batchId) {
@@ -2510,7 +2512,7 @@ router.get('/analytics/enrollments', authMiddleware, requireAdmin, async (req, r
       });
       
       // Group by date
-      const enrollmentDate = new Date(enrollmentData.enrolledAt).toISOString().split('T')[0];
+      const enrollmentDate = (enrollmentData.enrolledAt?.toDate?.() || new Date(enrollmentData.enrolledAt)).toDate().toISOString().split('T')[0];
       dailyEnrollments[enrollmentDate] = (dailyEnrollments[enrollmentDate] || 0) + 1;
       
       // Group by batch
@@ -2550,8 +2552,8 @@ router.get('/analytics/enrollments', authMiddleware, requireAdmin, async (req, r
     previousPeriodStart.setTime(previousPeriodStart.getTime() - (Date.now() - startDate.getTime()));
     
     const previousEnrollmentSnapshot = await firestore.collection('enrollments')
-      .where('enrolledAt', '>=', previousPeriodStart.toISOString())
-      .where('enrolledAt', '<', startDate.toISOString())
+      .where('enrolledAt', '>=', Timestamp.fromDate(previousPeriodStart))
+      .where('enrolledAt', '<', Timestamp.fromDate(startDate))
       .get();
     
     const previousEnrollmentCount = previousEnrollmentSnapshot.size;
@@ -2576,8 +2578,8 @@ router.get('/analytics/enrollments', authMiddleware, requireAdmin, async (req, r
           .map(([courseId, count]) => ({ courseId, enrollments: count })),
         timeframe,
         dateRange: {
-          start: startDate.toISOString(),
-          end: new Date().toISOString()
+          start: admin.firestore.Timestamp.fromDate(startDate),
+          end: admin.firestore.Timestamp.fromDate(new Date())
         }
       }
     };
@@ -2658,7 +2660,9 @@ router.get('/analytics/progress', authMiddleware, requireAdmin, async (req, res)
       totalProgress += progress;
       
       // Check if student is active (has activity in last 30 days)
-      const lastActivity = enrollmentData.lastActivityAt ? new Date(enrollmentData.lastActivityAt) : new Date(enrollmentData.enrolledAt);
+      const lastActivity = enrollmentData.lastActivityAt ? 
+        (enrollmentData.lastActivityAt?.toDate?.() || new Date(enrollmentData.lastActivityAt)) : 
+        (enrollmentData.enrolledAt?.toDate?.() || new Date(enrollmentData.enrolledAt));
       if (lastActivity >= thirtyDaysAgo) {
         progressData.activeStudents++;
       }
@@ -2701,7 +2705,7 @@ router.get('/analytics/progress', authMiddleware, requireAdmin, async (req, res)
           studentId: enrollmentData.studentId,
           batchId: enrollmentData.batchId,
           progress: progress,
-          lastActivity: lastActivity.toISOString()
+          lastActivity: admin.firestore.Timestamp.fromDate(lastActivity)
         });
       }
     }
@@ -2786,7 +2790,7 @@ router.get('/analytics/revenue', authMiddleware, requireAdmin, async (req, res) 
     
     // Build query for enrollments with payment data
     let enrollmentQuery = firestore.collection('enrollments')
-      .where('enrolledAt', '>=', startDate.toISOString())
+      .where('enrolledAt', '>=', Timestamp.fromDate(startDate))
       .where('paymentStatus', '==', 'completed')
       .orderBy('enrolledAt', 'desc');
     
@@ -2812,7 +2816,7 @@ router.get('/analytics/revenue', authMiddleware, requireAdmin, async (req, res) 
     for (const doc of enrollmentSnapshot.docs) {
       const enrollmentData = doc.data();
       const amount = enrollmentData.amount || 0;
-      const enrollmentDate = new Date(enrollmentData.enrolledAt);
+      const enrollmentDate = enrollmentData.enrolledAt?.toDate?.() || new Date(enrollmentData.enrolledAt);
       
       revenueData.totalRevenue += amount;
       revenueData.totalTransactions++;
@@ -2841,7 +2845,7 @@ router.get('/analytics/revenue', authMiddleware, requireAdmin, async (req, res) 
         batchId: enrollmentData.batchId,
         amount: amount,
         paymentMethod: paymentMethod,
-        date: enrollmentData.enrolledAt
+        date: enrollmentData.enrolledAt?.toDate?.() || new Date(enrollmentData.enrolledAt)
       });
     }
     
@@ -3012,7 +3016,7 @@ router.get('/analytics/courses', authMiddleware, requireAdmin, async (req, res) 
         courseId: course.id,
         title: course.title,
         category: course.category,
-        createdAt: course.createdAt,
+        createdAt: course.createdAt?.toDate?.() || new Date(course.createdAt),
         isActive: course.isActive,
         metrics: {
           totalBatches,
@@ -3027,8 +3031,8 @@ router.get('/analytics/courses', authMiddleware, requireAdmin, async (req, res) 
           id: batch.id,
           name: batch.name,
           status: batch.status,
-          startDate: batch.startDate,
-          endDate: batch.endDate
+          startDate: batch.startDate?.toDate?.() || new Date(batch.startDate),
+          endDate: batch.endDate?.toDate?.() || new Date(batch.endDate)
         }))
       });
     }
@@ -3296,15 +3300,15 @@ router.post('/courses/:courseId/batches', authMiddleware, requireAdmin, async (r
       title: batchTitle.trim(),
       name: batchTitle.trim(), // Keep for backward compatibility
       description: description.trim(),
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
+      startDate: Timestamp.fromDate(start),
+      endDate: Timestamp.fromDate(end),
       maxStudents: maxStudentsNum,
       enrolledStudents: 0,
       status: status,
       price: price ? parseFloat(price) : 0,
       thumbnailUrl: thumbnailUrl ? thumbnailUrl.trim() : '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: Timestamp.fromDate(new Date()),
+      updatedAt: Timestamp.fromDate(new Date()),
       createdBy: req.user.uid
     };
 
@@ -3443,13 +3447,13 @@ router.put('/courses/:courseId/batches/:batchId', authMiddleware, requireAdmin, 
       title: batchTitle.trim(),
       name: batchTitle.trim(), // Keep for backward compatibility
       description: description.trim(),
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
+      startDate: Timestamp.fromDate(start),
+      endDate: Timestamp.fromDate(end),
       maxStudents: maxStudentsNum,
       status: status,
       price: price !== undefined ? parseFloat(price) : (currentData.price || 0),
       thumbnailUrl: thumbnailUrl ? thumbnailUrl.trim() : '',
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     };
 
     await batchRef.update(updateData);
@@ -3559,8 +3563,8 @@ router.get('/settings', authMiddleware, requireAdmin, async (req, res) => {
     let dbSettings = {};
     
     try {
-      // Try to fetch settings from Firestore
-      const settingsDoc = await firestore.collection('platformSettings').doc('main_config').get();
+      // Try to fetch settings from Firestore using the correct path: settings/platform
+      const settingsDoc = await firestore.collection('settings').doc('platform').get();
       
       if (settingsDoc.exists) {
         dbSettings = settingsDoc.data();
@@ -3624,11 +3628,11 @@ router.put('/settings', authMiddleware, requireAdmin, async (req, res) => {
     // Add timestamp for the update
     const updateData = {
       ...settingsUpdate,
-      updatedAt: new Date().toISOString()
+      updatedAt: Timestamp.fromDate(new Date())
     };
     
-    // Update the settings document (create if doesn't exist)
-    const settingsRef = firestore.collection('platformSettings').doc('main_config');
+    // Update the settings document (create if doesn't exist) using correct path: settings/platform
+    const settingsRef = firestore.collection('settings').doc('platform');
     
     // Use merge: true to only update provided fields
     await settingsRef.set(updateData, { merge: true });
@@ -3673,8 +3677,8 @@ router.post('/settings/reset', authMiddleware, requireAdmin, async (req, res) =>
   try {
     const defaultSettings = getDefaultSettings();
     
-    // Reset the settings document to defaults
-    const settingsRef = firestore.collection('platformSettings').doc('main_config');
+    // Reset the settings document to defaults using correct path: settings/platform
+    const settingsRef = firestore.collection('settings').doc('platform');
     await settingsRef.set(defaultSettings);
     
     // Invalidate settings cache
@@ -3708,13 +3712,10 @@ router.post('/settings/reset', authMiddleware, requireAdmin, async (req, res) =>
 router.get('/users/:uid/profile', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { uid } = req.params;
-    console.log(`🔍 [PROFILE] Fetching profile for user: ${uid}`);
 
     // Fetch basic user profile from users collection
     const userDoc = await firestore.collection('users').doc(uid).get();
-    console.log(`🔍 [PROFILE] User document exists: ${userDoc.exists}`);
     if (!userDoc.exists) {
-      console.log(`❌ [PROFILE] User not found in Firestore: ${uid}`);
       return res.status(404).json({
         error: 'User Not Found',
         message: 'The specified user does not exist'
@@ -3884,7 +3885,6 @@ router.get('/users/:uid/profile', authMiddleware, requireAdmin, async (req, res)
       };
     }
 
-    console.log(`✅ [PROFILE] Successfully fetched profile for user: ${uid}`);
     res.status(200).json({
       success: true,
       data: profileData,
@@ -3892,7 +3892,7 @@ router.get('/users/:uid/profile', authMiddleware, requireAdmin, async (req, res)
     });
 
   } catch (error) {
-    console.error('❌ [PROFILE] Error fetching user profile:', error);
+    console.error('❌ [PROFILE] Error fetching user profile');
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to fetch user profile'
@@ -4772,8 +4772,8 @@ router.get('/discussions/topics', authMiddleware, requireAdmin, async (req, res)
         },
         category: data.category || 'general',
         tags: data.tags || [],
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
+        createdAt: data.createdAt || Timestamp.fromDate(new Date()),
+        updatedAt: data.updatedAt || data.createdAt || Timestamp.fromDate(new Date()),
         participants: data.participants || 0,
         messages: messageCount,
         views: data.views || 0,
@@ -4829,9 +4829,9 @@ router.put('/discussions/:discussionId/:action', authMiddleware, requireAdmin, a
     }
     
     let updateData = {
-      updatedAt: new Date().toISOString(),
+      updatedAt: Timestamp.fromDate(new Date()),
       moderatedBy: req.user.uid,
-      moderatedAt: new Date().toISOString()
+      moderatedAt: Timestamp.fromDate(new Date())
     };
     
     switch (action) {

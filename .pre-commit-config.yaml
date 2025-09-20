@@ -1,0 +1,50 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-case-conflict
+      - id: check-json
+      - id: pretty-format-json
+        args: ['--autofix']
+      - id: check-toml
+      - id: check-xml
+      - id: mixed-line-ending
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            yarn\.lock|
+            \.secrets\.baseline
+          )$
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.0
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: block-env-files
+        name: Block .env files
+        entry: bash -c 'if git diff --cached --name-only | grep -E "\.env(\.|$)"; then echo "ERROR: .env files should not be committed. Use .env.example instead."; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: check-secrets-in-files
+        name: Check for potential secrets
+        entry: bash -c 'git diff --cached --name-only | xargs grep -l -i -E "(password|secret|key|token|api_key)" | grep -v "\.example$" | grep -v "\.md$" | grep -v "\.yaml$" | head -1 && echo "WARNING: Potential secrets detected. Please review carefully." && exit 1 || exit 0'
+        language: system
+        pass_filenames: false
+        always_run: true

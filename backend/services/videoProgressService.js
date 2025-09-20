@@ -48,8 +48,8 @@ class VideoProgressService {
         data: {
           progressId,
           ...progressData,
-          lastWatched: new Date(),
-          updatedAt: new Date()
+          lastWatched: admin.firestore.Timestamp.fromDate(new Date()),
+          updatedAt: admin.firestore.Timestamp.fromDate(new Date())
         }
       };
     } catch (error) {
@@ -192,8 +192,8 @@ class VideoProgressService {
           progressId,
           ...progressData,
           ...updatedData,
-          completedAt: new Date(),
-          updatedAt: new Date()
+          completedAt: admin.firestore.Timestamp.fromDate(new Date()),
+          updatedAt: admin.firestore.Timestamp.fromDate(new Date())
         }
       };
     } catch (error) {

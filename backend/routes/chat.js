@@ -78,7 +78,7 @@ router.post('/:chatId/messages', authMiddleware, async (req, res) => {
       message: message.trim(),
       type,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      createdAt: new Date().toISOString()
+      createdAt: admin.firestore.Timestamp.fromDate(new Date())
     };
     
     const messageRef = await db.collection('chats')

@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { db } = require('../config/firebase');
+const admin = require('firebase-admin');
 const muxService = require('./muxService');
 const notificationService = require('./notificationService');
 
@@ -39,8 +40,8 @@ class SchedulerService {
    */
   async loadScheduledLiveStreams() {
     try {
-      const now = new Date();
-      const futureTime = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Next 24 hours
+      const now = admin.firestore.Timestamp.fromDate(new Date());
+      const futureTime = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() + 24 * 60 * 60 * 1000)); // Next 24 hours
 
       // Get all scheduled live streams (without complex where clauses to avoid index requirement)
       const scheduledStreamsSnapshot = await db.collection('schedule')
@@ -52,7 +53,7 @@ class SchedulerService {
       const futureStreams = scheduledStreamsSnapshot.docs.filter(doc => {
         const data = doc.data();
         const scheduledAt = data.scheduledAt.toDate();
-        return scheduledAt > now && scheduledAt <= futureTime;
+        return scheduledAt > now.toDate() && scheduledAt <= futureTime.toDate();
       });
 
       console.log(`📅 Loaded ${futureStreams.length} scheduled live streams`);
@@ -71,8 +72,8 @@ class SchedulerService {
    */
   async checkScheduledLiveStreams() {
     try {
-      const now = new Date();
-      const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
+      const now = admin.firestore.Timestamp.fromDate(new Date());
+      const fiveMinutesFromNow = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() + 5 * 60 * 1000));
 
       // Get all scheduled live streams (without complex where clauses to avoid index requirement)
       const scheduledStreamsSnapshot = await db
@@ -85,7 +86,7 @@ class SchedulerService {
       const streamsToStart = scheduledStreamsSnapshot.docs.filter(doc => {
         const data = doc.data();
         const scheduledAt = data.scheduledAt.toDate();
-        return scheduledAt <= fiveMinutesFromNow && scheduledAt > now;
+        return scheduledAt <= fiveMinutesFromNow.toDate() && scheduledAt > now.toDate();
       });
 
       if (streamsToStart.length === 0) {
@@ -113,7 +114,7 @@ class SchedulerService {
    * @param {Date} scheduledTime - When to start the stream
    */
   scheduleTask(scheduleId, scheduledTime) {
-    const now = new Date();
+    const now = admin.firestore.Timestamp.fromDate(new Date());
     const delay = scheduledTime.getTime() - now.getTime();
 
     if (delay <= 0) {
@@ -171,7 +172,7 @@ class SchedulerService {
         rtmpUrl: liveStreamData.rtmpUrl,
         liveStreamStatus: 'ready',
         status: 'live_ready',
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       // Send notifications to enrolled students
@@ -188,7 +189,7 @@ class SchedulerService {
       await db.collection('schedule').doc(scheduleId).update({
         status: 'failed',
         error: error.message,
-        updatedAt: new Date()
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
     }
   }
@@ -280,8 +281,8 @@ class SchedulerService {
         subjectId: scheduleData.subjectId,
         batchId: scheduleData.batchId,
         createdBy: scheduleData.createdBy,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date()),
         status: 'active',
         isFromLiveStream: true,
         originalScheduleId: scheduleId
@@ -297,8 +298,8 @@ class SchedulerService {
       await db.collection('schedule').doc(scheduleId).update({
         convertedToTopicVideo: true,
         topicVideoContentId: contentRef.id,
-        conversionCompletedAt: new Date(),
-        updatedAt: new Date()
+        conversionCompletedAt: admin.firestore.Timestamp.fromDate(new Date()),
+        updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
 
       // Notify students about the recording availability
@@ -320,9 +321,10 @@ class SchedulerService {
    */
   async sendLiveStreamReminders() {
     try {
-      const now = new Date();
-      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
-      const sixteenMinutesFromNow = new Date(now.getTime() + 16 * 60 * 1000);
+      const now = admin.firestore.Timestamp.fromDate(new Date());
+      const fiveMinutesFromNow = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() + 5 * 60 * 1000));
+      const fifteenMinutesFromNow = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() + 15 * 60 * 1000));
+      const sixteenMinutesFromNow = admin.firestore.Timestamp.fromDate(new Date(now.toDate().getTime() + 16 * 60 * 1000));
 
       // Get scheduled live streams starting in 15-16 minutes
       const scheduledStreamsSnapshot = await db.collection('schedule')
@@ -334,7 +336,7 @@ class SchedulerService {
       const streamsForReminder = scheduledStreamsSnapshot.docs.filter(doc => {
         const data = doc.data();
         const scheduledAt = data.scheduledAt.toDate();
-        return scheduledAt >= fifteenMinutesFromNow && scheduledAt <= sixteenMinutesFromNow;
+        return scheduledAt >= fifteenMinutesFromNow.toDate() && scheduledAt <= sixteenMinutesFromNow.toDate();
       });
 
       if (streamsForReminder.length === 0) {
